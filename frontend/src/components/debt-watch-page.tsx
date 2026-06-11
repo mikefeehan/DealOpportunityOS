@@ -59,9 +59,17 @@ export function DebtWatchPage() {
   }, []);
 
   const sorted = useMemo(() => {
+    const missing = (v: unknown) => v === 0 || v === "" || v === null || v === undefined;
     return [...rows].sort((a, b) => {
-      const av = a[sortKey] ?? 0;
-      const bv = b[sortKey] ?? 0;
+      const av = a[sortKey];
+      const bv = b[sortKey];
+      // N/A (0 / blank) always sorts to the bottom, regardless of direction —
+      // so "lowest DSCR" shows the lowest real values first, dashes last.
+      const am = missing(av);
+      const bm = missing(bv);
+      if (am && bm) return 0;
+      if (am) return 1;
+      if (bm) return -1;
       if (typeof av === "number" && typeof bv === "number") {
         return sortAsc ? av - bv : bv - av;
       }
