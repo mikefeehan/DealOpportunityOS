@@ -91,7 +91,9 @@ def estimate_market_rent(submarket: str, average_rent: float, year_built: int) -
     """
     if not average_rent or average_rent <= 0:
         return 0.0
-    benchmark = _submarket_benchmark(submarket)
+    # Prefer the real HelloData market median when a reference is loaded; fall back
+    # to the modeled submarket table only when no market data is available.
+    benchmark = market_rent_benchmark() or _submarket_benchmark(submarket)
     if benchmark > average_rent:
         return float(round(benchmark))
     uplift = 1.08 if (year_built and year_built <= 2010) else 1.04
