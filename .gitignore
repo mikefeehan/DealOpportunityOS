@@ -19,3 +19,6 @@ opportunityos-home.png
 data/market_reference/*.csv
 data/market_reference/*.xlsx
 data/market_reference/*.pdf
+# owner-tracer local output
+owner-tracer/tracker.csv
+owner-tracer/enriched_*.csv
