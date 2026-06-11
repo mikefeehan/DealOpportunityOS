@@ -71,15 +71,17 @@ export function PropertyDetailPage({ id }: { id: string }) {
                 {property.owner_name}
               </Link>
             </div>
-            <div>
-              <div className="text-xs uppercase text-muted">Mailing address</div>
-              <div className="mt-1 text-sm text-ink">{property.mailing_address}</div>
-            </div>
+            {!/pending parcel match/i.test(property.mailing_address) && (
+              <div>
+                <div className="text-xs uppercase text-muted">Mailing address</div>
+                <div className="mt-1 text-sm text-ink">{property.mailing_address}</div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
-              <Metric label="Parcel ID" value={property.parcel_id} />
               <Metric label="Owner State" value={property.owner_state || "Unknown"} />
               <Metric label="Held" value={`${property.hold_period.toFixed(1)} yrs`} />
               <Metric label="Last Sale" value={property.last_sale_year} />
+              {!/^(IMP|WEB)-/.test(property.parcel_id) && <Metric label="Parcel ID" value={property.parcel_id} />}
             </div>
             <div className="flex flex-wrap gap-2">
               {property.potential_721_candidate && <Badge tone="amber">POTENTIAL 721 CANDIDATE</Badge>}

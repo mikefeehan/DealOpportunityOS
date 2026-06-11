@@ -26,28 +26,33 @@ function money(value: number) {
 }
 
 function popupHTML(p: MapPoint): string {
-  const tag = (text: string, color: string) =>
-    `<span style="display:inline-block;border:1px solid ${color}55;background:${color}1a;color:${color};border-radius:4px;padding:1px 6px;font-size:11px;margin:2px 4px 0 0;">${text}</span>`;
-  const recColor = p.recommendation === "Call Owner" ? "#3fb950" : p.recommendation === "Ignore" ? "#8b949e" : "#e8c15a";
+  const tag = (text: string, color: string, bg: string) =>
+    `<span style="display:inline-block;border:1px solid ${color};background:${bg};color:${color};border-radius:4px;padding:1px 7px;font-size:11px;font-weight:600;margin:3px 4px 0 0;">${text}</span>`;
+  const rec =
+    p.recommendation === "Call Owner"
+      ? tag("Call Owner", "#15803d", "#dcfce7")
+      : p.recommendation === "Ignore"
+        ? tag("Ignore", "#374151", "#e5e7eb")
+        : tag("Monitor", "#92600a", "#fef3c7");
   const tags = [
-    tag(p.recommendation, recColor),
-    p.star_rating ? tag(`${p.star_rating}★ ${p.building_class || ""}`.trim(), "#58a6ff") : "",
-    p.potential_721_candidate ? tag("721", "#e8c15a") : "",
-    p.affordable ? tag("Affordable", "#8b949e") : "",
-    p.for_sale ? tag("For sale", "#58a6ff") : ""
+    rec,
+    p.star_rating ? tag(`${p.star_rating}★ ${p.building_class || ""}`.trim(), "#1d4ed8", "#dbeafe") : "",
+    p.potential_721_candidate ? tag("721", "#92600a", "#fef3c7") : "",
+    p.affordable ? tag("Affordable", "#374151", "#e5e7eb") : "",
+    p.for_sale ? tag("For sale", "#1d4ed8", "#dbeafe") : ""
   ].join("");
-  return `<div style="font-family:inherit;min-width:210px;">
-    <div style="font-weight:600;color:#e6edf3;font-size:13px;">${p.name}</div>
-    <div style="color:#8b949e;font-size:11px;margin-top:2px;">${p.address}</div>
-    <div style="color:#c9d1d9;font-size:12px;margin-top:6px;">${p.owner_name}</div>
-    <div style="display:flex;gap:10px;margin-top:6px;font-size:12px;color:#c9d1d9;">
-      <span>Call <b style="color:#e8c15a;">${p.call_score.toFixed(0)}</b></span>
+  return `<div style="font-family:inherit;min-width:212px;color:#111827;">
+    <div style="font-weight:700;color:#111827;font-size:14px;">${p.name}</div>
+    <div style="color:#374151;font-size:12px;margin-top:3px;">${p.address}</div>
+    <div style="color:#111827;font-size:12px;font-weight:600;margin-top:7px;">${p.owner_name}</div>
+    <div style="display:flex;gap:12px;margin-top:6px;font-size:12px;color:#1f2937;">
+      <span>Call <b style="color:#b45309;">${p.call_score.toFixed(0)}</b></span>
       <span>${p.units} units</span>
       <span>${p.year_built || "—"}</span>
-      <span>${p.rent_gap ? p.rent_gap.toFixed(0) + "% gap" : ""}</span>
+      ${p.rent_gap ? `<span>${p.rent_gap.toFixed(0)}% gap</span>` : ""}
     </div>
     <div style="margin-top:4px;">${tags}</div>
-    <a href="/properties/${p.id}" style="display:inline-block;margin-top:8px;color:#e8c15a;font-size:12px;text-decoration:none;">Open property →</a>
+    <a href="/properties/${p.id}" style="display:inline-block;margin-top:9px;color:#b45309;font-size:12px;font-weight:600;text-decoration:none;">Open property →</a>
   </div>`;
 }
 

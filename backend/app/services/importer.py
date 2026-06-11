@@ -26,7 +26,7 @@ from backend.app.models import Property
 from backend.app.services.addresses import address_key as compute_address_key
 from backend.app.services.market_reference import market_rent_benchmark, market_rent_for
 from backend.app.services.scanner import _lookup_pima_by_address
-from backend.app.services.seed_data import purge_seed_data, upsert_property
+from backend.app.services.seed_data import dedupe_by_street, purge_seed_data, upsert_property
 
 try:  # chardet ships with the project; degrade gracefully if absent.
     import chardet
@@ -555,7 +555,9 @@ def import_universe(
 
     db.commit()
     # Real data now exists — clear seeded demo records so they don't pollute the
-    # call list or owner rollups.
+    # call list or owner rollups, and fuzzy-merge same-site duplicates that the
+    # address key missed (house-number ranges, etc.).
     if summary["imported"] > 0:
         summary["demos_removed"] = purge_seed_data(db)
+        summary["merged_duplicates"] = dedupe_by_street(db)
     return summary

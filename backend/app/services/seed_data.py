@@ -620,6 +620,55 @@ def upsert_property(db: Session, payload: dict, merge: bool = False) -> Property
     return prop
 
 
+def dedupe_by_street(db: Session) -> int:
+    """Merge same-site records that share street name + units + vintage.
+
+    Catches duplicates the address key misses (house-number ranges, etc.) while
+    staying conservative: it requires the same market, the same street-name key,
+    the same unit count, and a build year within two years before merging.
+    """
+    from collections import defaultdict
+
+    from backend.app.services.addresses import street_name_key
+
+    rows = db.scalars(select(Property).where(Property.data_status != "seeded_fallback")).all()
+    groups: dict[tuple, list[Property]] = defaultdict(list)
+    for prop in rows:
+        key = street_name_key(prop.address)
+        if key and prop.units:
+            groups[(prop.market, key, prop.units)].append(prop)
+
+    removed = 0
+    columns = [c.name for c in Property.__table__.columns if c.name != "id"]
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        # Sub-cluster by build year so genuinely different buildings on the same
+        # street with the same unit count (different vintages) are NOT merged.
+        members.sort(key=lambda p: p.year_built or 0)
+        clusters: list[list[Property]] = []
+        for prop in members:
+            for cluster in clusters:
+                if abs((prop.year_built or 0) - (cluster[0].year_built or 0)) <= 2:
+                    cluster.append(prop)
+                    break
+            else:
+                clusters.append([prop])
+        for cluster in clusters:
+            if len(cluster) < 2:
+                continue
+            cluster.sort(key=lambda p: (-len((p.sources or "").split(",")), p.id))
+            canonical = cluster[0]
+            for other in cluster[1:]:
+                payload = {name: getattr(other, name) for name in columns}
+                _merge_payload(canonical, payload)
+                db.delete(other)
+                removed += 1
+    if removed:
+        db.commit()
+    return removed
+
+
 def purge_seed_data(db: Session) -> int:
     """Delete all seeded demo records. Returns how many were removed."""
     rows = db.scalars(select(Property).where(Property.data_status == "seeded_fallback")).all()

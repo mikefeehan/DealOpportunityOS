@@ -59,8 +59,8 @@ function MarketContextPanel({ ctx }: { ctx: MarketContext }) {
         <ContextMetric label="Median Income" value={demographics.median_income ? formatMoney(demographics.median_income, false) : "—"} />
         <ContextMetric label="Employment Rate" value={demographics.employment_rate ? `${demographics.employment_rate}%` : "—"} />
         <ContextMetric
-          label="Comp Set"
-          value={ctx.comp_set.properties ? `${formatNumber(ctx.comp_set.properties)} props` : "—"}
+          label="HelloData Rent Comps"
+          value={ctx.comp_set.properties ? `${formatNumber(ctx.comp_set.properties)} comps` : "—"}
           sub={ctx.comp_set.median_rent ? `${formatMoney(ctx.comp_set.median_rent, false)} median rent` : undefined}
         />
       </CardContent>
