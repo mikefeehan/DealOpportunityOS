@@ -23,8 +23,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.models import Property
+from backend.app.services.market_reference import market_rent_benchmark, market_rent_for
 from backend.app.services.scanner import _lookup_pima_by_address
-from backend.app.services.seed_data import upsert_property
+from backend.app.services.seed_data import purge_seed_data, upsert_property
 
 try:  # chardet ships with the project; degrade gracefully if absent.
     import chardet
@@ -412,7 +413,17 @@ def import_universe(
         if market_rent and not average_rent:
             average_rent = round(market_rent * 0.82, 0)
         if not market_rent:
-            market_rent = estimate_market_rent(submarket, average_rent, year_built)
+            # Prefer a real HelloData market rent matched on address; otherwise a
+            # modeled submarket benchmark. In-place (average) rent comes from the
+            # export; if it's missing but we have a HelloData rent, use it as the
+            # current rent so the property still shows a figure (no upside signal).
+            hellodata_rent = market_rent_for(address)
+            if hellodata_rent:
+                market_rent = hellodata_rent
+                if not average_rent:
+                    average_rent = hellodata_rent
+            elif average_rent and average_rent > 0:
+                market_rent = estimate_market_rent(submarket, average_rent, year_built)
         assessed_value = _to_float(pima.get("assessed_value", 0)) or units * 95_000
         row_source = get(row, "source").strip()
         property_type = "Under Construction" if _is_preopen(status, year_built, datetime.utcnow().year) else "Apartments"
@@ -461,4 +472,8 @@ def import_universe(
             )
 
     db.commit()
+    # Real data now exists — clear seeded demo records so they don't pollute the
+    # call list or owner rollups.
+    if summary["imported"] > 0:
+        summary["demos_removed"] = purge_seed_data(db)
     return summary

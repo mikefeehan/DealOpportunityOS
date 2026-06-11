@@ -170,6 +170,7 @@ export type ImportSummary = {
   no_match?: number;
   skipped?: number;
   skipped_reasons?: string[];
+  demos_removed?: number;
   detected_columns?: string[];
   column_map?: Record<string, string>;
   sample?: { name: string; address: string; units: number; match_status: string; parcel_id: string }[];

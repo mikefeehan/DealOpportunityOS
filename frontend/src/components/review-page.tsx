@@ -108,6 +108,7 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
               <Badge tone="amber">{result.needs_review ?? 0} need review</Badge>
               <Badge tone="red">{result.no_match ?? 0} no match</Badge>
               {result.skipped ? <Badge tone="default">{result.skipped} skipped</Badge> : null}
+              {result.demos_removed ? <Badge tone="default">{result.demos_removed} demos removed</Badge> : null}
               <span className="text-xs text-muted">from {result.rows_seen} rows</span>
             </div>
             {result.skipped_reasons && result.skipped_reasons.length > 0 && (

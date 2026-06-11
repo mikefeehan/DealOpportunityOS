@@ -15,3 +15,6 @@ dist/
 .playwright-mcp/
 opportunityos-home.png
 .claude/
+# Licensed market data exports (HelloData etc.) — keep the folder, not the data
+data/market_reference/*.csv
+data/market_reference/*.xlsx

@@ -584,7 +584,25 @@ def upsert_property(db: Session, payload: dict) -> Property:
     return prop
 
 
+def purge_seed_data(db: Session) -> int:
+    """Delete all seeded demo records. Returns how many were removed."""
+    rows = db.scalars(select(Property).where(Property.data_status == "seeded_fallback")).all()
+    for row in rows:
+        db.delete(row)
+    db.commit()
+    return len(rows)
+
+
+def has_live_data(db: Session) -> bool:
+    return db.scalar(select(Property.id).where(Property.data_status != "seeded_fallback").limit(1)) is not None
+
+
 def ensure_seed_data(db: Session) -> int:
+    # Once real data exists, demo records are no longer needed: purge them and
+    # don't re-seed. Demos only exist to keep a brand-new, empty install populated.
+    if has_live_data(db):
+        purge_seed_data(db)
+        return 0
     inserted_or_updated = 0
     for payload in SEEDED_PROPERTIES:
         upsert_property(

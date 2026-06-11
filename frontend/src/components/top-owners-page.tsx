@@ -107,6 +107,7 @@ export function TopOwnersPage() {
   const [prepOwner, setPrepOwner] = useState("");
   const [scope, setScope] = useState<Scope | null>(null);
   const [liveCount, setLiveCount] = useState(0);
+  const [fallbackCount, setFallbackCount] = useState(0);
 
   // Decide the initial scope from provenance: show live imported data once any
   // exists (hiding demo), otherwise show everything (demo fallback) so the
@@ -115,6 +116,7 @@ export function TopOwnersPage() {
     getSummary().then((summary) => {
       const live = summary.data_provenance.live_records ?? 0;
       setLiveCount(live);
+      setFallbackCount(summary.data_provenance.fallback_records ?? 0);
       setScope(live > 0 ? "live" : "all");
     });
   }, []);
@@ -146,31 +148,33 @@ export function TopOwnersPage() {
     <div>
       <PageHeading eyebrow="Today's Call List" title="Top Owners To Call">
         <div className="flex flex-col items-end gap-2">
-          <div className="inline-flex overflow-hidden rounded-md border border-border">
-            <button
-              type="button"
-              onClick={() => setScope("live")}
-              disabled={liveCount === 0}
-              className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-                scope === "live" ? "bg-green/15 text-green" : "bg-panel2 text-muted hover:text-ink"
-              )}
-              title={liveCount === 0 ? "No live imported records yet — import a file in Import & Review" : undefined}
-            >
-              <ShieldCheck size={13} />
-              Live Data Only{liveCount > 0 ? ` (${liveCount})` : ""}
-            </button>
-            <button
-              type="button"
-              onClick={() => setScope("all")}
-              className={cn(
-                "inline-flex items-center gap-1.5 border-l border-border px-3 py-1.5 text-xs font-medium transition-colors",
-                scope === "all" ? "bg-amber/15 text-amber" : "bg-panel2 text-muted hover:text-ink"
-              )}
-            >
-              Include Demo Fallback
-            </button>
-          </div>
+          {fallbackCount > 0 && (
+            <div className="inline-flex overflow-hidden rounded-md border border-border">
+              <button
+                type="button"
+                onClick={() => setScope("live")}
+                disabled={liveCount === 0}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                  scope === "live" ? "bg-green/15 text-green" : "bg-panel2 text-muted hover:text-ink"
+                )}
+                title={liveCount === 0 ? "No live imported records yet — import a file in Import & Review" : undefined}
+              >
+                <ShieldCheck size={13} />
+                Live Data Only{liveCount > 0 ? ` (${liveCount})` : ""}
+              </button>
+              <button
+                type="button"
+                onClick={() => setScope("all")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 border-l border-border px-3 py-1.5 text-xs font-medium transition-colors",
+                  scope === "all" ? "bg-amber/15 text-amber" : "bg-panel2 text-muted hover:text-ink"
+                )}
+              >
+                Include Demo Fallback
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-2 text-sm text-muted">
             <PhoneCall size={16} className="text-amber" />
             Sorted by Call Score
