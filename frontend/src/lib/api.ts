@@ -92,6 +92,16 @@ export function getMapPoints(dataScope?: string) {
   return fetchJson<MapPoint[]>(`/api/map${query ? `?${query}` : ""}`, []);
 }
 
+export async function geocodeMissing(): Promise<{ status: string; geocoded?: number; remaining?: number }> {
+  const query = withMarket(new URLSearchParams()).toString();
+  try {
+    const response = await fetch(`${API_BASE}/api/map/geocode${query ? `?${query}` : ""}`, { method: "POST" });
+    return await response.json();
+  } catch {
+    return { status: "error" };
+  }
+}
+
 export function getMarketContext() {
   return fetchJson<MarketContext>("/api/market/context", {
     available: false,

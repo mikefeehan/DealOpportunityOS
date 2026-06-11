@@ -13,6 +13,7 @@ from backend.app.database import Base, engine, ensure_runtime_columns, get_db
 from backend.app.models import Pipeline, Property
 from backend.app.services.ai_insights import generate_ai_call_prep
 from backend.app.services.exports import build_opportunities_csv, build_today_call_list_pdf
+from backend.app.services.geocoding import geocode_missing
 from backend.app.services.importer import import_universe
 from backend.app.services.market_context import load_market_context
 from backend.app.services.ranking import (
@@ -96,6 +97,11 @@ def map_points(
     db: Session = Depends(get_db),
 ) -> list[dict]:
     return get_map_points(db, data_scope=data_scope, market=market)
+
+
+@app.post("/api/map/geocode")
+def geocode(market: str | None = Query(None), db: Session = Depends(get_db)) -> dict:
+    return geocode_missing(db, market=market)
 
 
 @app.get("/api/today-call-list")

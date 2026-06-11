@@ -2,10 +2,11 @@
 
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Map as MbMap, Popup as MbPopup, GeoJSONSource } from "mapbox-gl";
-import { Search } from "lucide-react";
+import { Locate, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { getMapPoints, MAPBOX_TOKEN } from "@/lib/api";
+import { geocodeMissing, getMapPoints, MAPBOX_TOKEN } from "@/lib/api";
 import type { MapPoint } from "@/lib/types";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeading } from "@/components/page-heading";
 
@@ -58,6 +59,13 @@ export function MapPage() {
   const [query, setQuery] = useState("");
   const [count, setCount] = useState(0);
   const [ready, setReady] = useState(false);
+  const [geocoding, setGeocoding] = useState(false);
+
+  async function runGeocode() {
+    setGeocoding(true);
+    await geocodeMissing();
+    window.location.reload();
+  }
 
   useEffect(() => {
     if (!MAPBOX_TOKEN || !containerRef.current || mapRef.current) return;
@@ -158,6 +166,10 @@ export function MapPage() {
             />
           </div>
           <span className="text-sm text-muted">{count} sites</span>
+          <Button variant="secondary" onClick={runGeocode} disabled={geocoding} title="Place any sites missing coordinates onto the map">
+            <Locate size={15} className={geocoding ? "animate-pulse" : ""} />
+            {geocoding ? "Geocoding" : "Geocode missing"}
+          </Button>
         </div>
       </PageHeading>
 
