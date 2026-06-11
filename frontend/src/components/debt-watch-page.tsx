@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, Flame } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowUpDown, Building2, Flame } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { getDebtWatch } from "@/lib/api";
 import type { PropertyOpportunity } from "@/lib/types";
 import { formatMoney, formatNumber, ownerHref } from "@/lib/utils";
@@ -20,9 +20,34 @@ function MaturityBadge({ year }: { year?: number }) {
   return <Badge tone={tone}>{year}</Badge>;
 }
 
+type SortKey =
+  | "name"
+  | "owner_name"
+  | "units"
+  | "loan_maturity_year"
+  | "interest_rate"
+  | "dscr"
+  | "loan_amount"
+  | "debt_pressure"
+  | "call_score";
+
+const COLUMNS: Array<[SortKey, string]> = [
+  ["name", "Property"],
+  ["owner_name", "Owner"],
+  ["units", "Units"],
+  ["loan_maturity_year", "Maturity"],
+  ["interest_rate", "Rate"],
+  ["dscr", "Est. DSCR"],
+  ["loan_amount", "Loan"],
+  ["debt_pressure", "Pressure"],
+  ["call_score", "Call"]
+];
+
 export function DebtWatchPage() {
   const [rows, setRows] = useState<PropertyOpportunity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sortKey, setSortKey] = useState<SortKey>("debt_pressure");
+  const [sortAsc, setSortAsc] = useState(false);
 
   useEffect(() => {
     getDebtWatch(200).then((data) => {
@@ -30,6 +55,26 @@ export function DebtWatchPage() {
       setLoading(false);
     });
   }, []);
+
+  const sorted = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      const av = a[sortKey] ?? 0;
+      const bv = b[sortKey] ?? 0;
+      if (typeof av === "number" && typeof bv === "number") {
+        return sortAsc ? av - bv : bv - av;
+      }
+      return sortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+    });
+  }, [rows, sortKey, sortAsc]);
+
+  function sortBy(key: SortKey) {
+    if (sortKey === key) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortKey(key);
+      setSortAsc(false);
+    }
+  }
 
   const imminent = rows.filter((r) => r.loan_maturity_year && r.loan_maturity_year - THIS_YEAR <= 2).length;
   const distressed = rows.filter((r) => r.dscr && r.dscr < 1.2).length;
@@ -63,20 +108,19 @@ export function DebtWatchPage() {
               <table className="w-full min-w-[1080px] border-collapse text-left">
                 <thead className="bg-panel2 text-xs uppercase text-muted">
                   <tr>
-                    <th className="px-3 py-2">Property</th>
-                    <th className="px-3 py-2">Owner</th>
-                    <th className="px-3 py-2">Units</th>
-                    <th className="px-3 py-2">Maturity</th>
-                    <th className="px-3 py-2">Rate</th>
-                    <th className="px-3 py-2">Est. DSCR</th>
-                    <th className="px-3 py-2">Loan</th>
-                    <th className="px-3 py-2">Pressure</th>
-                    <th className="px-3 py-2">Call</th>
+                    {COLUMNS.map(([key, label]) => (
+                      <th key={key} className="px-3 py-2">
+                        <button className="inline-flex items-center gap-1 hover:text-amber" onClick={() => sortBy(key)}>
+                          {label}
+                          <ArrowUpDown size={12} className={sortKey === key ? "text-amber" : ""} />
+                        </button>
+                      </th>
+                    ))}
                     <th className="px-3 py-2">Why Now</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
+                  {sorted.map((row) => (
                     <tr key={row.id} className="border-b border-border hover:bg-panel2/70">
                       <td className="px-3 py-3">
                         <Link href={`/properties/${row.id}`} className="inline-flex items-center gap-2 font-medium text-ink hover:text-amber">

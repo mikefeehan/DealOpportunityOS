@@ -4,9 +4,11 @@ import csv
 from io import BytesIO, StringIO
 from typing import Any
 
+from xml.sax.saxutils import escape
+
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape, letter
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy.orm import Session
 
@@ -28,6 +30,8 @@ def build_opportunities_csv(db: Session) -> str:
             "recommendation",
             "property",
             "owner",
+            "owner_phone",
+            "owner_email",
             "units",
             "year_built",
             "hold_period",
@@ -53,6 +57,8 @@ def build_opportunities_csv(db: Session) -> str:
                 "recommendation": row["recommendation"],
                 "property": row["name"],
                 "owner": row["owner_name"],
+                "owner_phone": row.get("owner_phone", ""),
+                "owner_email": row.get("owner_email", ""),
                 "units": row["units"],
                 "year_built": row["year_built"],
                 "hold_period": row["hold_period"],
@@ -68,33 +74,45 @@ def build_opportunities_csv(db: Session) -> str:
     return output.getvalue()
 
 
+# Paragraph styles so long cells (owner, property, why-call) wrap within their
+# column instead of overflowing the page.
+_CELL = ParagraphStyle("cell", fontName="Helvetica", fontSize=7, leading=8.5, textColor=colors.HexColor("#111111"))
+_HEAD = ParagraphStyle("head", fontName="Helvetica-Bold", fontSize=7.5, leading=9, textColor=colors.HexColor("#E8C15A"))
+
+
+def _p(text: Any, style: ParagraphStyle = _CELL) -> Paragraph:
+    return Paragraph(escape(str(text)), style)
+
+
 def _call_list_table(title: str, rows: list[dict[str, Any]], owner_rows: bool = True) -> list[Any]:
     styles = getSampleStyleSheet()
     story: list[Any] = [Paragraph(title, styles["Heading2"])]
-    header = ["Owner", "Property", "Units", "Years Held", "Call Score", "Why Call"]
-    data = [header]
+    headers = ["Owner", "Phone", "Property", "Units", "Held", "Call", "Why Call"]
+    data = [[_p(h, _HEAD) for h in headers]]
     for row in rows:
         prop = row.get("top_property", row) if owner_rows else row
+        phone = row.get("owner_phone") or prop.get("owner_phone", "") or "-"
         data.append(
             [
-                row.get("owner", row.get("owner_name", ""))[:28],
-                prop.get("name", "")[:28],
-                str(row.get("units_owned", prop.get("units", ""))),
-                f"{row.get('average_hold_period', prop.get('hold_period', 0)):.0f}",
-                f"{row.get('call_score', prop.get('call_score', 0)):.1f}",
-                row.get("why_now", prop.get("why_now", ""))[:90],
+                _p(row.get("owner", row.get("owner_name", ""))),
+                _p(phone),
+                _p(prop.get("name", "")),
+                _p(row.get("units_owned", prop.get("units", ""))),
+                _p(f"{row.get('average_hold_period', prop.get('hold_period', 0)):.0f}"),
+                _p(f"{row.get('call_score', prop.get('call_score', 0)):.1f}"),
+                _p(row.get("why_now", prop.get("why_now", ""))),
             ]
         )
-    table = Table(data, repeatRows=1, colWidths=[120, 120, 45, 58, 58, 260])
+    # Widths sum to ~724pt, within landscape-letter usable width (~744pt).
+    table = Table(data, repeatRows=1, colWidths=[96, 70, 96, 34, 34, 34, 360])
     table.setStyle(
         TableStyle(
             [
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#111111")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#E8C15A")),
                 ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#555555")),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
                 ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#F8F8F8"), colors.white]),
             ]
         )
