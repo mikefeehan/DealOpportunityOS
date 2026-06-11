@@ -51,6 +51,7 @@ def _candidate_files() -> list[Path]:
 def load_market_reference() -> dict:
     by_street: dict[str, float] = {}
     rents: list[float] = []
+    psfs: list[float] = []
     for path in _candidate_files():
         try:
             with open(path, encoding="utf-8-sig", errors="replace") as handle:
@@ -59,6 +60,7 @@ def load_market_reference() -> dict:
                     continue
                 addr_col = _find_column(reader.fieldnames, "address", "propertyaddress", "siteaddress")
                 rent_col = _find_column(reader.fieldnames, "rent", "askingrent", "marketrent", "effectiverent")
+                psf_col = _find_column(reader.fieldnames, "psf", "rentpersf", "rentpsf", "avgpsf")
                 if not addr_col or not rent_col:
                     continue
                 for row in reader:
@@ -69,11 +71,16 @@ def load_market_reference() -> dict:
                     if key:
                         by_street[key] = rent
                         rents.append(rent)
+                    if psf_col:
+                        psf = _money(row.get(psf_col, ""))
+                        if 0 < psf < 10:
+                            psfs.append(psf)
         except Exception:  # noqa: BLE001 - a bad reference file must not break imports
             continue
     return {
         "by_street": by_street,
         "median": statistics.median(rents) if rents else 0.0,
+        "median_psf": statistics.median(psfs) if psfs else 0.0,
         "count": len(by_street),
     }
 
@@ -87,3 +94,8 @@ def market_rent_for(address: str) -> float | None:
 def market_rent_benchmark() -> float:
     """Median HelloData rent, used as a real-data fallback benchmark (0 if none loaded)."""
     return load_market_reference()["median"]
+
+
+def market_psf_benchmark() -> float:
+    """Median HelloData rent-per-SF, used for size-aware market rent (0 if none)."""
+    return load_market_reference()["median_psf"]

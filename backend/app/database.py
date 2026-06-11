@@ -40,6 +40,7 @@ _ADDED_PROPERTY_COLUMNS = {
     "match_confidence": "FLOAT DEFAULT 0",
     "matched_address": "VARCHAR(255) DEFAULT ''",
     "last_verified_at": "DATETIME",
+    "avg_unit_sf": "INTEGER DEFAULT 0",
     "address_key": "VARCHAR(160) DEFAULT ''",
     "market": "VARCHAR(120) DEFAULT 'Tucson, AZ'",
     "sources": "VARCHAR(255) DEFAULT ''",

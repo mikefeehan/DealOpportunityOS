@@ -37,6 +37,7 @@ def property_to_dict(prop: Property) -> dict[str, Any]:
         "units": prop.units,
         "year_built": prop.year_built,
         "building_sqft": prop.building_sqft,
+        "avg_unit_sf": prop.avg_unit_sf,
         "assessed_value": prop.assessed_value,
         "owner_name": prop.owner_name,
         "mailing_address": prop.mailing_address,

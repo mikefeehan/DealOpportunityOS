@@ -13,6 +13,7 @@ from backend.app.database import Base, engine, ensure_runtime_columns, get_db
 from backend.app.models import Pipeline, Property
 from backend.app.services.ai_insights import generate_ai_call_prep
 from backend.app.services.exports import build_opportunities_csv, build_today_call_list_pdf
+from backend.app.services.enrichment import enrich_emails
 from backend.app.services.geocoding import geocode_missing
 from backend.app.services.importer import import_universe
 from backend.app.services.market_context import load_market_context
@@ -102,6 +103,15 @@ def map_points(
 @app.post("/api/map/geocode")
 def geocode(market: str | None = Query(None), db: Session = Depends(get_db)) -> dict:
     return geocode_missing(db, market=market)
+
+
+@app.post("/api/enrich/emails")
+def enrich_email(
+    market: str | None = Query(None),
+    limit: int = Query(25, ge=1, le=200),
+    db: Session = Depends(get_db),
+) -> dict:
+    return enrich_emails(db, market=market, limit=limit)
 
 
 @app.get("/api/today-call-list")

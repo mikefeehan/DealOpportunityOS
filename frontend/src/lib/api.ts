@@ -186,6 +186,17 @@ export async function importUniverse(file: File, sourceName: string, enrichParce
   }
 }
 
+export async function enrichEmails(limit = 25): Promise<{ status: string; emails_applied?: number; searched?: number; remaining_domains?: number; error?: string }> {
+  const params = withMarket(new URLSearchParams());
+  params.set("limit", String(limit));
+  try {
+    const response = await fetch(`${API_BASE}/api/enrich/emails?${params.toString()}`, { method: "POST" });
+    return await response.json();
+  } catch {
+    return { status: "error" };
+  }
+}
+
 export function confirmMatch(propertyId: number) {
   return fetchJson(`/api/review/${propertyId}/confirm`, { id: propertyId }, { method: "POST" });
 }

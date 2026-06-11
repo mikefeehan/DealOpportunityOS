@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { MailSearch, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { getOwners } from "@/lib/api";
+import { enrichEmails, getOwners } from "@/lib/api";
 import type { OwnerProfile } from "@/lib/types";
 import { formatMoney, formatNumber, ownerHref } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -19,10 +19,25 @@ export function OwnerIntelligencePage() {
   const [owners, setOwners] = useState<OwnerProfile[]>([]);
   const [query, setQuery] = useState("");
   const [intrustMode, setIntrustMode] = useState(true);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichMsg, setEnrichMsg] = useState("");
 
   useEffect(() => {
     getOwners(intrustMode, 200).then(setOwners);
   }, [intrustMode]);
+
+  async function runEnrich() {
+    setEnriching(true);
+    setEnrichMsg("");
+    const result = await enrichEmails(25);
+    setEnrichMsg(
+      result.status === "ok"
+        ? `Found ${result.emails_applied ?? 0} emails (${result.remaining_domains ?? 0} domains left)`
+        : result.error || "Enrichment failed"
+    );
+    getOwners(intrustMode, 200).then(setOwners);
+    setEnriching(false);
+  }
 
   const filtered = useMemo(() => {
     const needle = query.toLowerCase();
@@ -46,6 +61,11 @@ export function OwnerIntelligencePage() {
           <Button variant={intrustMode ? "default" : "secondary"} onClick={() => setIntrustMode(!intrustMode)}>
             InTrust Mode {intrustMode ? "On" : "Off"}
           </Button>
+          <Button variant="secondary" onClick={runEnrich} disabled={enriching} title="Find owner emails via Hunter.io from owner websites">
+            <MailSearch size={15} className={enriching ? "animate-pulse" : ""} />
+            {enriching ? "Enriching" : "Enrich emails"}
+          </Button>
+          {enrichMsg && <span className="text-xs text-muted">{enrichMsg}</span>}
         </div>
       </PageHeading>
       <Card>

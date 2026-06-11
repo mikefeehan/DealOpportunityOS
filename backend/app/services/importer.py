@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.models import Property
 from backend.app.services.addresses import address_key as compute_address_key
-from backend.app.services.market_reference import market_rent_benchmark, market_rent_for
+from backend.app.services.market_reference import market_psf_benchmark, market_rent_benchmark, market_rent_for
 from backend.app.services.scanner import _lookup_pima_by_address
 from backend.app.services.seed_data import dedupe_by_street, purge_seed_data, upsert_property
 
@@ -46,6 +46,8 @@ COLUMN_ALIASES: dict[str, list[str]] = {
     "submarket": ["submarketname", "submarket", "submkt"],
     "status": ["propertyspecialstatus", "specialstatus", "buildingstatus", "propertystatus", "status", "constructionstatus"],
     "units": ["numberofunits", "units", "unitcount", "nounits", "noofunits", "totalunits", "unit", "doors"],
+    "building_sqft": ["rba", "buildingsqft", "rentablebuildingarea", "grosssqft", "sqft", "totalsqft"],
+    "avg_unit_sf": ["avgunitsf", "averageunitsf", "avgsf", "unitsf"],
     "year_built": ["yearbuilt", "built", "yrbuilt", "vintage", "yearbuiltoriginal", "constructionyear", "completiondate", "yearcompleted", "completionyear"],
     "year_renovated": ["yearrenovated", "renovated", "yearreno"],
     "average_rent": ["averagerent", "avgrent", "currentrent", "inplacerent", "latestmonthlyrent", "monthlyrent", "actualrent"],
@@ -459,6 +461,15 @@ def import_universe(
             market = f"{market}, {prop_state.upper()}"
         status = get(row, "status").strip()
 
+        # Unit size — needed so market rent is sized to the unit, not a flat
+        # per-unit number (a 350sf studio can't fetch a 900sf 1-bed's rent).
+        building_sqft = _to_int(get(row, "building_sqft"))
+        avg_unit_sf = _to_int(get(row, "avg_unit_sf"))
+        if not avg_unit_sf and building_sqft and units:
+            avg_unit_sf = int(building_sqft / units)
+        if not building_sqft and avg_unit_sf and units:
+            building_sqft = avg_unit_sf * units
+
         # Rents: in-place (average) from a rent-roll source; market/effective from
         # CoStar (effective) or HelloData (asking). Effective is already net of
         # concessions; asking-derived market rents get discounted to net-effective.
@@ -471,12 +482,16 @@ def import_universe(
             average_rent = round(market_rent * 0.82, 0)
         if not market_rent:
             hellodata_rent = market_rent_for(address)
+            psf = market_psf_benchmark()
             if hellodata_rent:
                 market_rent = round(hellodata_rent * NET_EFFECTIVE_FACTOR)
                 if not average_rent:
                     average_rent = hellodata_rent
             elif asking_rent:
                 market_rent = round(asking_rent * NET_EFFECTIVE_FACTOR)
+            elif avg_unit_sf and psf:
+                # Size-aware: real $/SF times this property's unit size.
+                market_rent = round(psf * avg_unit_sf * NET_EFFECTIVE_FACTOR)
             elif average_rent and average_rent > 0:
                 market_rent = round(estimate_market_rent(submarket, average_rent, year_built) * NET_EFFECTIVE_FACTOR)
         effective_rent = effective_rent or market_rent
@@ -523,7 +538,8 @@ def import_universe(
             "units": units,
             "year_built": year_built,
             "year_renovated": year_renovated,
-            "building_sqft": int(units * 875),
+            "building_sqft": building_sqft or int(units * 875),
+            "avg_unit_sf": avg_unit_sf,
             "assessed_value": assessed_value,
             "owner_name": get(row, "owner_name").strip() or pima.get("owner_name") or "Owner pending parcel match",
             "mailing_address": pima.get("mailing_address") or "Mailing address pending parcel match",

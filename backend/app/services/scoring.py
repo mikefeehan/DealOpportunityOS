@@ -365,11 +365,18 @@ def calculate_score(prop: Property, current_year: int | None = None) -> ScoreRes
     year = current_year or date.today().year
     hold_period = max(0, year - (prop.last_sale_year or year))
     rent_gap = 0.0
-    if prop.market_rent:
+    # A gap needs BOTH a market rent and a known in-place rent. Without in-place
+    # rent (average_rent == 0) the "gap" would just be 100% -> a false signal.
+    if prop.market_rent and prop.average_rent:
         rent_gap = clamp((prop.market_rent - prop.average_rent) / prop.market_rent * 100, 0, 55)
     # Rent-restricted / affordable assets can't mark to market — the upside is not
     # realizable, so don't reward it.
     if getattr(prop, "affordable", False):
+        rent_gap = 0.0
+    # Implausibly small "units" (mobile-home lots, extended-stay, or bad SF data)
+    # make the per-unit market comparison meaningless — don't claim a gap.
+    unit_sf = getattr(prop, "avg_unit_sf", 0) or 0
+    if unit_sf and unit_sf < 250:
         rent_gap = 0.0
     basis_gap = calculate_basis_gap(prop)
 

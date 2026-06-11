@@ -15,6 +15,7 @@ class Property(Base):
     units: Mapped[int] = mapped_column(Integer)
     year_built: Mapped[int] = mapped_column(Integer)
     building_sqft: Mapped[int] = mapped_column(Integer, default=0)
+    avg_unit_sf: Mapped[int] = mapped_column(Integer, default=0)
     assessed_value: Mapped[float] = mapped_column(Float)
     owner_name: Mapped[str] = mapped_column(String(255), index=True)
     mailing_address: Mapped[str] = mapped_column(String(255))
