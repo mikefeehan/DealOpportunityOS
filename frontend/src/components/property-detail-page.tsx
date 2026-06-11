@@ -13,6 +13,7 @@ import { DemoBadge } from "@/components/demo-badge";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeading } from "@/components/page-heading";
+import { PropertyMap } from "@/components/property-map";
 import { RecommendationBadge } from "@/components/recommendation-badge";
 import { ScorePill } from "@/components/score-pill";
 
@@ -111,6 +112,16 @@ export function PropertyDetailPage({ id }: { id: string }) {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mt-4">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Location</CardTitle>
+          <span className="text-sm text-muted">{property.address}</span>
+        </CardHeader>
+        <CardContent>
+          <PropertyMap lat={property.latitude} lon={property.longitude} name={property.name} />
+        </CardContent>
+      </Card>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
         <Card>
