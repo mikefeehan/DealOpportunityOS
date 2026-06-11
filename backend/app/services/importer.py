@@ -77,6 +77,8 @@ COLUMN_ALIASES: dict[str, list[str]] = {
     "affordable_type": ["affordabletype"],
     "rent_type": ["renttype"],
     "loan_maturity": ["maturitydate", "loanmaturitydate", "loanmaturity"],
+    "interest_rate": ["interestrate", "loaninterestrate"],
+    "loan_amount": ["originationamount", "loanamount", "originalloanamount", "loanorigination"],
     "source": ["source", "datasource", "provider"],
 }
 
@@ -499,6 +501,8 @@ def import_universe(
         for_sale_price = _to_float(get(row, "for_sale_price"))
         for_sale = _to_bool_yes(get(row, "for_sale_status")) or for_sale_price > 0
         loan_maturity_year = _to_year(get(row, "loan_maturity"))
+        interest_rate = _to_float(get(row, "interest_rate"))
+        loan_amount = _to_float(get(row, "loan_amount"))
         year_renovated = _to_year(get(row, "year_renovated"))
 
         owner_contact = get(row, "owner_contact").strip() or " ".join(
@@ -549,6 +553,8 @@ def import_universe(
             "affordable": affordable,
             "affordable_type": affordable_type,
             "loan_maturity_year": loan_maturity_year,
+            "interest_rate": interest_rate,
+            "loan_amount": loan_amount,
             "owner_contact": _clean_contact(owner_contact),
             "owner_phone": _clean_contact(get(row, "owner_phone")),
             "owner_email": _clean_contact(get(row, "owner_email")),

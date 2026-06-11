@@ -11,6 +11,7 @@ from backend.app.models import OpportunityScore, Pipeline, Property
 from backend.app.services.scoring import (
     INTRUST_MODE_OWNER_STATES,
     PIPELINE_STAGES,
+    estimate_dscr,
     is_institutional_owner,
     is_private_owner,
     recommended_angle_for_property,
@@ -59,6 +60,9 @@ def property_to_dict(prop: Property) -> dict[str, Any]:
         "affordable": prop.affordable,
         "affordable_type": prop.affordable_type,
         "loan_maturity_year": prop.loan_maturity_year,
+        "interest_rate": prop.interest_rate,
+        "loan_amount": prop.loan_amount,
+        "dscr": estimate_dscr(prop),
         "year_renovated": prop.year_renovated,
         "effective_rent": prop.effective_rent,
         "owner_contact": prop.owner_contact,
@@ -171,8 +175,8 @@ def passes_intrust_mode(prop: Property) -> bool:
         return False
     if is_institutional_owner(prop.owner_name) or not is_private_owner(prop.owner_name):
         return False
-    if (prop.owner_state or "").upper() not in INTRUST_MODE_OWNER_STATES:
-        return False
+    # Owner location is intentionally NOT a filter — we don't care where the
+    # owner lives, only the asset, hold, and ownership profile.
     return True
 
 

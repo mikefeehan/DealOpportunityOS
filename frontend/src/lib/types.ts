@@ -36,6 +36,9 @@ export type PropertyOpportunity = {
   affordable?: boolean;
   affordable_type?: string;
   loan_maturity_year?: number;
+  interest_rate?: number;
+  loan_amount?: number;
+  dscr?: number;
   year_renovated?: number;
   effective_rent?: number;
   owner_contact?: string;

@@ -153,7 +153,7 @@ export function CommandCenterPage() {
             <div>Held more than 10 years</div>
             <div>Private / family / trust ownership</div>
             <div>Non-institutional ownership</div>
-            <div>AZ, CA, or NV ownership</div>
+            <div>Owner location not required</div>
           </CardContent>
         </Card>
       </div>

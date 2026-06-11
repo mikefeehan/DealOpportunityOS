@@ -58,6 +58,8 @@ class Property(Base):
     affordable: Mapped[bool] = mapped_column(Boolean, default=False)
     affordable_type: Mapped[str] = mapped_column(String(48), default="")
     loan_maturity_year: Mapped[int] = mapped_column(Integer, default=0)
+    interest_rate: Mapped[float] = mapped_column(Float, default=0)
+    loan_amount: Mapped[float] = mapped_column(Float, default=0)
     year_renovated: Mapped[int] = mapped_column(Integer, default=0)
     effective_rent: Mapped[float] = mapped_column(Float, default=0)
 

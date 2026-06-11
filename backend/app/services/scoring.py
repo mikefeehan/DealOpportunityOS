@@ -213,19 +213,73 @@ def score_quality(star_rating: float, building_class: str) -> float:
 
 
 def loan_maturity_pressure(loan_maturity_year: int, current_year: int) -> float:
-    """0-100 motivation signal: debt coming due is a strong reason to transact."""
+    """0-100: how soon the loan matures (refi/sale pressure).
+
+    A maturity more than a year in the past is stale data (the loan was long
+    since refinanced), not current distress, so it scores zero.
+    """
     if not loan_maturity_year:
         return 0.0
     years = loan_maturity_year - current_year
+    if years < -1:
+        return 0.0  # stale / already refinanced
     if years <= 0:
-        return 90.0  # matured / past due
+        return 90.0  # just matured / at the wall
     if years <= 1:
         return 100.0
     if years <= 2:
         return 80.0
     if years <= 3:
         return 60.0
+    if years <= 5:
+        return 30.0
     return 0.0
+
+
+def estimate_dscr(prop: Property, current_year: int | None = None) -> float:
+    """Estimated debt service coverage ratio (NOI / annual debt service).
+
+    Directional: NOI from in-place rent, occupancy, and a typical opex margin;
+    debt service from the loan amount amortized 30yr at the loan's rate. Returns
+    0 when there isn't enough data.
+    """
+    loan = getattr(prop, "loan_amount", 0) or 0
+    rate = getattr(prop, "interest_rate", 0) or 0
+    rent = prop.average_rent or getattr(prop, "effective_rent", 0) or prop.market_rent
+    if loan <= 0 or rate <= 0 or not prop.units or not rent:
+        return 0.0
+    occupancy = 1 - (getattr(prop, "vacancy", 0) or 0) / 100 if getattr(prop, "vacancy", 0) else 0.93
+    occupancy = clamp(occupancy, 0.5, 1.0) / 1.0
+    noi = prop.units * rent * 12 * occupancy * 0.58
+    monthly_rate = rate / 100 / 12
+    payment = loan * monthly_rate / (1 - (1 + monthly_rate) ** -360)
+    annual_debt_service = payment * 12
+    if annual_debt_service <= 0:
+        return 0.0
+    return round(noi / annual_debt_service, 2)
+
+
+def debt_pressure(prop: Property, current_year: int) -> float:
+    """0-100 debt-driven motivation: maturity timing + coverage stress + rate.
+
+    A maturing loan is the trigger; thin/negative coverage (low DSCR) and a high
+    coupon needing to refinance amplify it. Zero when there's no debt data.
+    """
+    maturity_year = getattr(prop, "loan_maturity_year", 0) or 0
+    stale_loan = bool(maturity_year) and (maturity_year - current_year) < -1
+    maturity = loan_maturity_pressure(maturity_year, current_year)
+    # Ignore DSCR/rate derived from a stale (long-refinanced) loan.
+    dscr = 0.0 if stale_loan else estimate_dscr(prop, current_year)
+    coverage_stress = 0.0
+    if dscr:
+        # 1.25x -> 0, 0.75x -> 100
+        coverage_stress = clamp((1.25 - dscr) / 0.5 * 100, 0, 100)
+    rate = 0 if stale_loan else (getattr(prop, "interest_rate", 0) or 0)
+    maturing_soon = bool(maturity_year) and -1 <= (maturity_year - current_year) <= 3
+    rate_stress = 15.0 if (rate >= 6 and maturing_soon) else 0.0
+    if maturity == 0 and dscr == 0:
+        return 0.0
+    return clamp(0.55 * maturity + 0.45 * coverage_stress + rate_stress)
 
 
 def calculate_market_value(prop: Property) -> float:
@@ -290,8 +344,9 @@ def calculate_motivation_score(
     )
     if recent_trade:
         score -= 24
-    # Debt coming due is added pressure on top of the base motivation profile.
-    score += loan_pressure * 0.12
+    # Debt distress (maturity + thin DSCR + high rate) is a major motivation
+    # driver, layered on top of the base ownership profile.
+    score += loan_pressure * 0.20
     return round(clamp(score), 1)
 
 
@@ -346,7 +401,7 @@ def calculate_score(prop: Property, current_year: int | None = None) -> ScoreRes
     location_rating = getattr(prop, "location_rating", "") or ""
     if location_rating:
         asset_score = round((asset_score + grade_to_score(location_rating)) / 2)
-    loan_pressure = loan_maturity_pressure(getattr(prop, "loan_maturity_year", 0) or 0, year)
+    loan_pressure = debt_pressure(prop, year)
 
     fit_score = calculate_fit_score(
         units_score=units_score,
@@ -404,11 +459,18 @@ def why_now_for_property(prop: Property, score: Any) -> str:
         reasons.append("potential 721 candidate")
     if score.rent_gap >= 18:
         reasons.append("below-market rents")
+    maturity = getattr(prop, "loan_maturity_year", 0) or 0
+    years_to_maturity = maturity - date.today().year if maturity else None
+    if years_to_maturity is not None and -1 <= years_to_maturity <= 3:
+        reasons.append(f"loan matures {maturity}")
+        dscr = estimate_dscr(prop)
+        if dscr and dscr < 1.2:
+            reasons.append(f"tight DSCR {dscr:.2f}")
     if 1970 <= prop.year_built <= 1995:
         reasons.append("vintage asset")
     if not reasons:
         reasons.append("moderate fit but lower owner motivation")
-    return ". ".join(reasons[:5]) + "."
+    return ". ".join(reasons[:6]) + "."
 
 
 def recommended_angle_for_property(prop: Property, score: Any) -> str:

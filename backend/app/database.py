@@ -55,6 +55,8 @@ _ADDED_PROPERTY_COLUMNS = {
     "affordable": "BOOLEAN DEFAULT 0",
     "affordable_type": "VARCHAR(48) DEFAULT ''",
     "loan_maturity_year": "INTEGER DEFAULT 0",
+    "interest_rate": "FLOAT DEFAULT 0",
+    "loan_amount": "FLOAT DEFAULT 0",
     "year_renovated": "INTEGER DEFAULT 0",
     "effective_rent": "FLOAT DEFAULT 0",
     "owner_contact": "VARCHAR(160) DEFAULT ''",

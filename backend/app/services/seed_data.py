@@ -557,7 +557,7 @@ SEEDED_PROPERTIES = [
 _MERGE_OVERWRITE = {
     "star_rating", "building_class", "location_rating", "cap_rate", "vacancy", "for_sale",
     "for_sale_price", "price_per_unit", "last_sale_price", "affordable", "affordable_type",
-    "loan_maturity_year", "year_renovated", "effective_rent", "market", "submarket",
+    "loan_maturity_year", "interest_rate", "loan_amount", "year_renovated", "effective_rent", "market", "submarket",
     "year_built", "last_sale_year", "market_rent", "building_sqft", "property_type",
     "match_status", "match_confidence", "matched_address", "data_status",
 }

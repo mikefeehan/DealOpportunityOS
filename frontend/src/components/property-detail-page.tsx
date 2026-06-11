@@ -160,6 +160,25 @@ export function PropertyDetailPage({ id }: { id: string }) {
         </Card>
       </div>
 
+      {(property.loan_maturity_year || property.interest_rate || property.loan_amount || property.dscr) ? (
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle>Debt &amp; Distress</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Metric label="Loan Maturity" value={property.loan_maturity_year || "—"} />
+            <Metric label="Interest Rate" value={property.interest_rate ? `${property.interest_rate.toFixed(2)}%` : "—"} />
+            <Metric label="Loan Amount" value={property.loan_amount ? formatMoney(property.loan_amount) : "—"} />
+            <div className="rounded-md border border-border bg-panel2 p-3">
+              <div className="text-xs uppercase text-muted">Est. DSCR</div>
+              <div className={`mt-1 text-sm font-semibold ${property.dscr && property.dscr < 1.2 ? "text-red" : "text-ink"}`}>
+                {property.dscr ? property.dscr.toFixed(2) : "—"}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card className="mt-4">
         <CardHeader className="flex flex-row items-center gap-2">
           <Building2 size={16} className="text-amber" />
