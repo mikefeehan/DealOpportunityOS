@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+opportunityos.db
+node_modules/
+.next/
+out/
+dist/
+.env
+.env.local
+*.log
+.playwright-mcp/
+opportunityos-home.png

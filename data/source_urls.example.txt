@@ -1,0 +1,10 @@
+# Add authorized Yardi, RealPage, HelloData, or other apartment inventory URLs here.
+# One URL per line. Tucson Scan will fetch these pages, extract apartment facts,
+# and enrich ownership from Pima/Tucson public parcel records.
+# If a source requires login, provide a local session cookie in .env:
+# YARDI_COOKIE=...
+# REALPAGE_COOKIE=...
+# HELLODATA_COOKIE=...
+#
+# Example:
+# https://authorized-source.example.com/tucson/property-name
