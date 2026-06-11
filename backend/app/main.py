@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from urllib.parse import unquote
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
@@ -36,14 +37,20 @@ from backend.app.services.seed_data import ensure_seed_data
 
 app = FastAPI(title="OpportunityOS Tucson Pilot", version="0.1.0")
 
+_allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+]
+# Extra production origins via env (comma-separated), e.g. your custom domain.
+_allowed_origins += [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
-    ],
+    allow_origins=_allowed_origins,
+    # Any Vercel deployment (preview or production) of the frontend can call the API.
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

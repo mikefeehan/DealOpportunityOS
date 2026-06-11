@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, Building2, Download, FileText, Flame, ListChecks, MapPin, PhoneCall, Radar, RefreshCw, UploadCloud, Users } from "lucide-react";
+import { BarChart3, Download, FileText, Flame, ListChecks, MapPin, PhoneCall, Radar, RefreshCw, UploadCloud, Users } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 import { scanTucson, exportUrl, getMarkets, getSelectedMarket, getSummary, setSelectedMarket } from "@/lib/api";
 import type { MarketOption } from "@/lib/types";
@@ -61,15 +61,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-background terminal-grid">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 border-r border-border bg-[#090909]/95 p-4 backdrop-blur lg:block">
-        <Link href="/" className="flex items-center gap-3 border-b border-border pb-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md border border-amber/40 bg-amber/10 text-amber">
-            <Building2 size={18} />
+        <div className="border-b border-border pb-4">
+          <Link href="/" className="block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/intrust-white.png" alt="InTrust Property Group" className="h-auto w-44" />
+          </Link>
+          <div className="mt-2 text-[10px] uppercase tracking-[0.18em] text-muted">
+            OpportunityOS · Acquisition Intelligence
           </div>
-          <div>
-            <div className="text-sm font-semibold text-ink">InTrust</div>
-            <div className="text-xs uppercase text-muted">OpportunityOS Tucson</div>
-          </div>
-        </Link>
+        </div>
         <nav className="mt-5 space-y-1">
           {nav.map((item) => {
             const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));

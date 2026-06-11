@@ -1,0 +1,19 @@
+# One-click backend deploy on Render (https://render.com).
+# New > Blueprint > point at this repo. Set HUNTER_API_KEY / MAPBOX_TOKEN /
+# ALLOWED_ORIGINS in the dashboard after the first deploy.
+services:
+  - type: web
+    name: opportunityos-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: MAPBOX_TOKEN
+        sync: false
+      - key: HUNTER_API_KEY
+        sync: false
