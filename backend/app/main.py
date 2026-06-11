@@ -14,10 +14,15 @@ from backend.app.database import Base, engine, ensure_runtime_columns, get_db
 from backend.app.models import Pipeline, Property
 from backend.app.services.ai_insights import generate_ai_call_prep
 from backend.app.services.exports import (
+    build_deals_xlsx,
     build_maturing_debt_pdf,
+    build_maturing_debt_xlsx,
     build_opportunities_csv,
     build_today_call_list_pdf,
+    build_today_call_list_xlsx,
 )
+
+XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 from backend.app.services.enrichment import enrich_emails
 from backend.app.services.geocoding import geocode_missing
 from backend.app.services.importer import import_universe
@@ -301,6 +306,33 @@ def export_maturing_debt_pdf(db: Session = Depends(get_db)) -> Response:
         content=pdf_payload,
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=intrust_maturing_debt.pdf"},
+    )
+
+
+@app.get("/api/export/today-call-list.xlsx")
+def export_call_list_xlsx(db: Session = Depends(get_db)) -> Response:
+    return Response(
+        content=build_today_call_list_xlsx(db),
+        media_type=XLSX_MEDIA,
+        headers={"Content-Disposition": "attachment; filename=intrust_call_list.xlsx"},
+    )
+
+
+@app.get("/api/export/maturing-debt.xlsx")
+def export_maturing_debt_xlsx(db: Session = Depends(get_db)) -> Response:
+    return Response(
+        content=build_maturing_debt_xlsx(db),
+        media_type=XLSX_MEDIA,
+        headers={"Content-Disposition": "attachment; filename=intrust_maturing_debt.xlsx"},
+    )
+
+
+@app.get("/api/export/deals.xlsx")
+def export_deals_xlsx(db: Session = Depends(get_db)) -> Response:
+    return Response(
+        content=build_deals_xlsx(db),
+        media_type=XLSX_MEDIA,
+        headers={"Content-Disposition": "attachment; filename=intrust_all_deals.xlsx"},
     )
 
 

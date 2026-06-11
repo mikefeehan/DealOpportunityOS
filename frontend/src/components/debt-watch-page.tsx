@@ -99,9 +99,9 @@ export function DebtWatchPage() {
             Ranked by debt pressure
           </span>
           <Button asChild variant="secondary">
-            <a href={exportUrl("/api/export/maturing-debt.pdf")}>
+            <a href={exportUrl("/api/export/maturing-debt.xlsx")}>
               <FileText size={15} />
-              Debt PDF
+              Debt Excel
             </a>
           </Button>
         </div>

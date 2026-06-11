@@ -5,6 +5,11 @@ from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Any
 
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
+
 from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
@@ -242,3 +247,105 @@ def build_maturing_debt_pdf(db: Session) -> bytes:
     doc.build(story)
     return buffer.getvalue()
 
+
+
+# --- Excel exports --------------------------------------------------------
+
+_XLSX_HEAD_FILL = PatternFill("solid", fgColor="12648A")  # InTrust blue
+_XLSX_HEAD_FONT = Font(bold=True, color="FFFFFF")
+_XLSX_RED_FONT = Font(color="C0392B", bold=True)
+
+
+def _write_sheet(
+    ws: Worksheet,
+    headers: list[str],
+    rows: list[list[Any]],
+    widths: list[int],
+    red_col: int | None = None,
+    red_below: float | None = None,
+) -> None:
+    ws.append(headers)
+    for col in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col)
+        cell.fill = _XLSX_HEAD_FILL
+        cell.font = _XLSX_HEAD_FONT
+        cell.alignment = Alignment(vertical="center")
+    for row in rows:
+        ws.append(row)
+    # Red font for a numeric column below a threshold (e.g. DSCR < 1.2).
+    if red_col is not None and red_below is not None:
+        for r in range(2, len(rows) + 2):
+            cell = ws.cell(row=r, column=red_col)
+            if isinstance(cell.value, (int, float)) and 0 < cell.value < red_below:
+                cell.font = _XLSX_RED_FONT
+    for i, width in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = width
+    ws.freeze_panes = "A2"
+    if rows:
+        ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{len(rows) + 1}"
+
+
+def _workbook_bytes(wb: Workbook) -> bytes:
+    buffer = BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()
+
+
+def build_today_call_list_xlsx(db: Session) -> bytes:
+    call_list = get_today_call_list(db)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Top 25 Owners"
+    headers = ["Rank", "Owner", "Phone", "Email", "Top Property", "Units", "Years Held",
+               "Call", "Fit", "Motivation", "721", "Why Now", "Recommended Angle"]
+    rows = []
+    for o in call_list["top_25_owners"]:
+        tp = o.get("top_property", {})
+        rows.append([
+            o.get("rank", ""), o.get("owner", ""), o.get("owner_phone", ""), o.get("owner_email", ""),
+            tp.get("name", ""), o.get("units_owned", ""), round(o.get("average_hold_period", 0)),
+            o.get("call_score", ""), o.get("fit_score", ""), o.get("motivation_score", ""),
+            "Yes" if o.get("potential_721_candidate") else "", o.get("why_now", ""), o.get("recommended_angle", ""),
+        ])
+    _write_sheet(ws, headers, rows, [6, 28, 16, 26, 26, 8, 10, 8, 8, 11, 6, 60, 60])
+    return _workbook_bytes(wb)
+
+
+def build_maturing_debt_xlsx(db: Session) -> bytes:
+    rows_data = get_debt_opportunities(db, data_scope="live", limit=300)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Maturing Debt"
+    headers = ["Property", "Owner", "Phone", "Units", "Maturity", "Rate %", "DSCR", "Loan",
+               "Lender", "Pressure", "Call", "Why Now"]
+    rows = []
+    for p in rows_data:
+        rows.append([
+            p.get("name", ""), p.get("owner_name", ""), p.get("owner_phone", ""), p.get("units", ""),
+            p.get("loan_maturity_year") or "", round(p.get("interest_rate") or 0, 2) or "",
+            p.get("dscr") or "", round(p.get("loan_amount") or 0), p.get("lender", ""),
+            p.get("debt_pressure", ""), p.get("call_score", ""), p.get("why_now", ""),
+        ])
+    _write_sheet(ws, headers, rows, [26, 24, 16, 8, 10, 8, 8, 14, 24, 10, 8, 60], red_col=7, red_below=1.2)
+    return _workbook_bytes(wb)
+
+
+def build_deals_xlsx(db: Session) -> bytes:
+    rows_data = get_ranked_properties(db, data_scope="live", limit=500)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "All Deals"
+    headers = ["Property", "Owner", "Lender", "Submarket", "Units", "Year Built", "Hold (yrs)",
+               "In-Place Rent", "Market Rent", "Rent Gap %", "DSCR", "Maturity", "Owner Phone",
+               "Owner State", "Call", "Recommendation"]
+    rows = []
+    for p in rows_data:
+        rows.append([
+            p.get("name", ""), p.get("owner_name", ""), p.get("lender", ""), p.get("submarket", ""),
+            p.get("units", ""), p.get("year_built", ""), round(p.get("hold_period", 0)),
+            round(p.get("average_rent") or 0), round(p.get("market_rent") or 0),
+            round(p.get("rent_gap") or 0, 1) or "", p.get("dscr") or "", p.get("loan_maturity_year") or "",
+            p.get("owner_phone", ""), p.get("owner_state", ""), p.get("call_score", ""), p.get("recommendation", ""),
+        ])
+    _write_sheet(ws, headers, rows, [26, 24, 22, 16, 8, 10, 9, 12, 12, 10, 8, 10, 16, 10, 8, 14], red_col=11, red_below=1.2)
+    return _workbook_bytes(wb)

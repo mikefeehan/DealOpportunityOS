@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpDown, Search } from "lucide-react";
+import { ArrowUpDown, FileText, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { getOpportunities } from "@/lib/api";
+import { exportUrl, getOpportunities } from "@/lib/api";
 import type { PropertyOpportunity } from "@/lib/types";
-import { formatMoney, ownerHref } from "@/lib/utils";
+import { ownerHref } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -97,7 +98,15 @@ export function DealsPage() {
   return (
     <div>
       <PageHeading eyebrow="Deal Finder" title="All Deals">
-        <span className="text-sm text-muted">{filtered.length} of {rows.length}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted">{filtered.length} of {rows.length}</span>
+          <Button asChild variant="secondary">
+            <a href={exportUrl("/api/export/deals.xlsx")}>
+              <FileText size={15} />
+              Excel
+            </a>
+          </Button>
+        </div>
       </PageHeading>
 
       <Card>

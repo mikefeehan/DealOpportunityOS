@@ -130,9 +130,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </a>
               </Button>
               <Button asChild>
-                <a href={exportUrl("/api/export/today-call-list.pdf")}>
+                <a href={exportUrl("/api/export/today-call-list.xlsx")}>
                   <FileText size={15} />
-                  Call List PDF
+                  Call List Excel
                 </a>
               </Button>
             </div>
