@@ -99,23 +99,23 @@ function OwnerRow({
   );
 }
 
-type Scope = "verified" | "all";
+type Scope = "live" | "all";
 
 export function TopOwnersPage() {
   const [data, setData] = useState<TodayCallList | null>(null);
   const [activePrep, setActivePrep] = useState<CallPrep | null>(null);
   const [prepOwner, setPrepOwner] = useState("");
   const [scope, setScope] = useState<Scope | null>(null);
-  const [verifiedCount, setVerifiedCount] = useState(0);
+  const [liveCount, setLiveCount] = useState(0);
 
-  // Decide the initial scope from provenance: default to verified-live once any
-  // verified records exist, otherwise show everything (demo fallback) so the
+  // Decide the initial scope from provenance: show live imported data once any
+  // exists (hiding demo), otherwise show everything (demo fallback) so the
   // dashboard is never empty.
   useEffect(() => {
     getSummary().then((summary) => {
-      const verified = summary.data_provenance.verified_live_records ?? 0;
-      setVerifiedCount(verified);
-      setScope(verified > 0 ? "verified" : "all");
+      const live = summary.data_provenance.live_records ?? 0;
+      setLiveCount(live);
+      setScope(live > 0 ? "live" : "all");
     });
   }, []);
 
@@ -149,16 +149,16 @@ export function TopOwnersPage() {
           <div className="inline-flex overflow-hidden rounded-md border border-border">
             <button
               type="button"
-              onClick={() => setScope("verified")}
-              disabled={verifiedCount === 0}
+              onClick={() => setScope("live")}
+              disabled={liveCount === 0}
               className={cn(
                 "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-                scope === "verified" ? "bg-green/15 text-green" : "bg-panel2 text-muted hover:text-ink"
+                scope === "live" ? "bg-green/15 text-green" : "bg-panel2 text-muted hover:text-ink"
               )}
-              title={verifiedCount === 0 ? "No verified live records yet — import and confirm in Import & Review" : undefined}
+              title={liveCount === 0 ? "No live imported records yet — import a file in Import & Review" : undefined}
             >
               <ShieldCheck size={13} />
-              Verified Live Only{verifiedCount > 0 ? ` (${verifiedCount})` : ""}
+              Live Data Only{liveCount > 0 ? ` (${liveCount})` : ""}
             </button>
             <button
               type="button"

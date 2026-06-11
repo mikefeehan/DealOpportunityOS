@@ -118,6 +118,7 @@ def owners(
 async def import_real_universe(
     file: UploadFile = File(...),
     source_name: str = Form(""),
+    enrich_parcels: bool = Form(False),
     db: Session = Depends(get_db),
 ) -> dict:
     filename = file.filename or "upload.csv"
@@ -127,7 +128,7 @@ async def import_real_universe(
     if not content:
         raise HTTPException(status_code=400, detail="The uploaded file is empty.")
     try:
-        result = import_universe(db, filename, content, source_name=source_name)
+        result = import_universe(db, filename, content, source_name=source_name, enrich_parcels=enrich_parcels)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     # status == "error" (e.g. missing required column) is returned as a 200 with a

@@ -30,6 +30,7 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [sourceName, setSourceName] = useState("");
+  const [enrichParcels, setEnrichParcels] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ImportSummary | null>(null);
 
@@ -37,7 +38,7 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
     if (!file) return;
     setBusy(true);
     setResult(null);
-    const summary = await importUniverse(file, sourceName);
+    const summary = await importUniverse(file, sourceName, enrichParcels);
     setResult(summary);
     setBusy(false);
     if (summary.status === "ok") {
@@ -85,6 +86,10 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
             {busy ? "Importing" : "Import"}
           </Button>
         </div>
+        <label className="mt-1 flex items-center gap-2 text-xs text-muted">
+          <input type="checkbox" checked={enrichParcels} onChange={(e) => setEnrichParcels(e.target.checked)} />
+          Match each record to a Pima County parcel on import (slower — best for small files; large files import fast and can be matched per-record later).
+        </label>
 
         {result && result.status === "error" && (
           <div className="rounded-md border border-red/35 bg-red/10 p-3 text-red">

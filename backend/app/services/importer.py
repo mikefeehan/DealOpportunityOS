@@ -15,6 +15,7 @@ import csv
 import hashlib
 import io
 import re
+import zipfile
 from datetime import datetime
 from typing import Any
 
@@ -33,16 +34,20 @@ except Exception:  # noqa: BLE001
 
 # Canonical field -> accepted header variants (compared after normalization).
 COLUMN_ALIASES: dict[str, list[str]] = {
+    "external_id": ["propertyid", "yardipropertyid", "externalid", "sourceid", "apn", "parcelnumber", "parcelid"],
     "name": ["propertyname", "property", "name", "community", "communityname", "apartmentname", "buildingname", "asset", "assetname"],
     "address": ["address", "propertyaddress", "siteaddress", "streetaddress", "location", "fulladdress", "addr"],
-    "units": ["units", "unitcount", "units", "nounits", "noofunits", "totalunits", "numberofunits", "unit", "doors"],
-    "year_built": ["yearbuilt", "built", "yrbuilt", "vintage", "yearbuiltoriginal", "constructionyear"],
-    "average_rent": ["averagerent", "avgrent", "currentrent", "inplacerent", "rent", "effectiverent", "actualrent"],
+    "city": ["propertycity", "sitecity", "city"],
+    "prop_state": ["propertystate", "sitestate", "state"],
+    "zip": ["zip", "zipcode", "postalcode", "propertyzip", "sitezip"],
+    "units": ["units", "unitcount", "nounits", "noofunits", "totalunits", "numberofunits", "unit", "doors"],
+    "year_built": ["yearbuilt", "built", "yrbuilt", "vintage", "yearbuiltoriginal", "constructionyear", "completiondate", "yearcompleted", "completionyear"],
+    "average_rent": ["averagerent", "avgrent", "currentrent", "inplacerent", "rent", "effectiverent", "actualrent", "latestmonthlyrent", "monthlyrent", "avgmarketrent"],
     "market_rent": ["marketrent", "proformarent", "achievablerent", "askingrent", "targetrent"],
     "owner_name": ["owner", "ownername", "ownership", "ownershipentity", "trueowner"],
-    "owner_city": ["ownercity", "mailingcity", "city"],
-    "owner_state": ["ownerstate", "mailingstate", "state", "st"],
-    "last_sale_year": ["lastsaleyear", "yearpurchased", "saleyear", "acquired", "acquisitionyear", "purchaseyear"],
+    "owner_city": ["ownercity", "mailingcity"],
+    "owner_state": ["ownerstate", "mailingstate", "ownerst"],
+    "last_sale_year": ["lastsaleyear", "yearpurchased", "saleyear", "acquired", "acquisitionyear", "purchaseyear", "latestsaledate", "saledate", "lastsaledate"],
     "source": ["source", "datasource", "provider"],
 }
 
@@ -90,6 +95,17 @@ def _to_float(value: Any) -> float:
         return 0.0
 
 
+def _to_year(value: Any) -> int:
+    """Extract a 4-digit year from a value that may be a date, datetime, or year.
+
+    Yardi exports dates like "2003-11-01 00:00:00"; a bare "1985" is also fine.
+    """
+    if value in (None, ""):
+        return 0
+    match = re.search(r"(19|20)\d{2}", str(value))
+    return int(match.group(0)) if match else 0
+
+
 def _decode_csv(content: bytes) -> str:
     if chardet is not None:
         guess = chardet.detect(content) or {}
@@ -122,10 +138,46 @@ def _parse_csv(content: bytes) -> list[dict[str, str]]:
     return rows
 
 
-def _parse_xlsx(content: bytes) -> list[dict[str, str]]:
+def _sanitize_xlsx_styles(content: bytes) -> bytes:
+    """Rewrite invalid color values in xl/styles.xml.
+
+    Some exporters (Yardi, certain report builders) emit color rgb attributes
+    that aren't 8-digit aRGB hex, which makes openpyxl refuse to open the file
+    ("Colors must be aRGB hex values"). We only need cell values, so normalize
+    the offending colors while preserving style indices the sheets reference.
+    """
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(content)) as zin, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename == "xl/styles.xml":
+                text = data.decode("utf-8", errors="replace")
+
+                def _fix(match: "re.Match[str]") -> str:
+                    value = match.group(1)
+                    if re.fullmatch(r"[0-9A-Fa-f]{8}", value):
+                        return match.group(0)
+                    if re.fullmatch(r"[0-9A-Fa-f]{6}", value):
+                        return f'rgb="FF{value}"'
+                    return 'rgb="FF000000"'
+
+                text = re.sub(r'rgb="([^"]*)"', _fix, text)
+                data = text.encode("utf-8")
+            zout.writestr(item, data)
+    return out.getvalue()
+
+
+def _load_xlsx_workbook(content: bytes):
     from openpyxl import load_workbook
 
-    workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    try:
+        return load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    except Exception:  # noqa: BLE001 - retry with sanitized styles before giving up
+        return load_workbook(io.BytesIO(_sanitize_xlsx_styles(content)), read_only=True, data_only=True)
+
+
+def _parse_xlsx(content: bytes) -> list[dict[str, str]]:
+    workbook = _load_xlsx_workbook(content)
     sheet = workbook.active
     rows_iter = sheet.iter_rows(values_only=True)
     try:
@@ -185,8 +237,10 @@ def _match_confidence(input_address: str, matched_address: str) -> float:
     return round(min(confidence, 1.0), 2)
 
 
-def _synthetic_parcel_id(address: str, name: str) -> str:
-    seed = (normalize_address(address) or name or "unknown").upper()
+def _synthetic_parcel_id(address: str, name: str, external_id: str = "") -> str:
+    # Prefer the source's own unique id so rows never collide and re-imports are
+    # idempotent; fall back to address, then name.
+    seed = (f"EXT:{external_id}" if external_id else normalize_address(address) or name or "unknown").upper()
     return f"IMP-{hashlib.sha1(seed.encode('utf-8')).hexdigest()[:12].upper()}"
 
 
@@ -195,9 +249,15 @@ def import_universe(
     filename: str,
     content: bytes,
     source_name: str = "",
+    enrich_parcels: bool = False,
     auto_verify_threshold: float = 0.9,
 ) -> dict[str, Any]:
-    """Parse, match, and upsert an export. Returns a structured summary."""
+    """Parse, match, and upsert an export. Returns a structured summary.
+
+    enrich_parcels: when True, each row does a live Pima County parcel lookup
+    (slow for large files). When False (default), records import fast as
+    ``needs_review`` with a synthetic parcel id; matching can be run later.
+    """
     rows = parse_rows(filename, content)
     if not rows:
         return {
@@ -248,7 +308,19 @@ def import_universe(
 
     for index, row in enumerate(rows):
         name = get(row, "name").strip()
-        address = normalize_address(get(row, "address"))
+        external_id = get(row, "external_id").strip()
+        # Compose a full street address from the location columns when present so
+        # records outside Tucson proper (Marana, Oro Valley) match the right parcel.
+        street = get(row, "address").strip()
+        city = get(row, "city").strip()
+        prop_state = get(row, "prop_state").strip()
+        zip_code = get(row, "zip").strip()
+        if street and (city or prop_state or zip_code):
+            tail = " ".join(part for part in [prop_state, zip_code] if part)
+            composed = ", ".join(part for part in [street, city] if part)
+            address = f"{composed}, {tail}" if tail else composed
+        else:
+            address = normalize_address(street)
         units = _to_int(get(row, "units"))
 
         if not name and not address:
@@ -260,23 +332,27 @@ def import_universe(
                 summary["skipped_reasons"].append(f"Row {index + 2}: missing/invalid units ({name or address})")
             continue
 
-        pima = _lookup_pima_by_address(address) if address else None
+        matched_address = ""
+        pima = (_lookup_pima_by_address(address) if address else None) if enrich_parcels else None
         if pima and pima.get("parcel_id"):
-            matched_address = ""  # Pima lookup returns owner/parcel; site address not echoed
             confidence = 0.6  # a successful fuzzy parcel hit, pending analyst confirmation
-            if confidence >= auto_verify_threshold:
-                match_status = "verified"
-            else:
-                match_status = "needs_review"
+            match_status = "verified" if confidence >= auto_verify_threshold else "needs_review"
             parcel_id = pima["parcel_id"]
-        else:
+        elif enrich_parcels:
+            # Matching was attempted but nothing was found.
             confidence = 0.0
             match_status = "no_match"
-            parcel_id = _synthetic_parcel_id(address, name)
-            pima = pima or {}
+            parcel_id = _synthetic_parcel_id(address, name, external_id)
+            pima = {}
+        else:
+            # Fast path: imported from an authorized source, parcel not yet matched.
+            confidence = 0.0
+            match_status = "needs_review"
+            parcel_id = _synthetic_parcel_id(address, name, external_id)
+            pima = {}
 
-        year_built = _to_int(get(row, "year_built")) or int(_to_float(pima.get("year_built", 0))) or 1985
-        last_sale_year = _to_int(get(row, "last_sale_year")) or DEFAULT_LAST_SALE_YEAR
+        year_built = _to_year(get(row, "year_built")) or int(_to_float(pima.get("year_built", 0))) or 1985
+        last_sale_year = _to_year(get(row, "last_sale_year")) or DEFAULT_LAST_SALE_YEAR
         average_rent = _to_float(get(row, "average_rent"))
         market_rent = _to_float(get(row, "market_rent"))
         if market_rent and not average_rent:

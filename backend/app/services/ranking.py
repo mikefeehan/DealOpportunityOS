@@ -83,23 +83,33 @@ def has_verified_live(db: Session) -> bool:
     return db.scalar(stmt) is not None
 
 
-def resolve_verified_only(db: Session, data_scope: str | None) -> bool:
-    """Translate a requested scope into a verified-only flag.
+def has_live(db: Session) -> bool:
+    stmt = select(Property.id).where(Property.data_status != "seeded_fallback").limit(1)
+    return db.scalar(stmt) is not None
 
-    - "verified": always verified-live records only.
+
+def resolve_scope(db: Session, data_scope: str | None) -> str | None:
+    """Translate a requested scope into a property filter.
+
+    - "verified": parcel-verified live records only.
+    - "live": any imported live record (verified or not), hides demo fallback.
     - "all": everything (includes seeded demo fallback).
-    - "auto"/None: verified-live if any exist, otherwise fall back to everything
+    - "auto"/None: verified-live if any exist, else any live, else everything
       so the dashboard always loads.
     """
     scope = (data_scope or "auto").lower()
-    if scope == "verified":
-        return True
+    if scope in {"verified", "live"}:
+        return scope
     if scope == "all":
-        return False
-    return has_verified_live(db)
+        return None
+    if has_verified_live(db):
+        return "verified"
+    if has_live(db):
+        return "live"
+    return None
 
 
-def query_properties(db: Session, verified_only: bool = False) -> list[Property]:
+def query_properties(db: Session, scope: str | None = None) -> list[Property]:
     stmt = (
         select(Property)
         .options(joinedload(Property.score), joinedload(Property.pipeline))
@@ -107,8 +117,10 @@ def query_properties(db: Session, verified_only: bool = False) -> list[Property]
         .where(Property.units >= 50)
         .order_by(OpportunityScore.call_score.desc(), OpportunityScore.acquisition_score.desc())
     )
-    if verified_only:
+    if scope == "verified":
         stmt = stmt.where(Property.match_status == "verified", Property.data_status != "seeded_fallback")
+    elif scope == "live":
+        stmt = stmt.where(Property.data_status != "seeded_fallback")
     return list(db.scalars(stmt).all())
 
 
@@ -169,9 +181,9 @@ def get_ranked_properties(
     limit: int | None = None,
     data_scope: str | None = None,
 ) -> list[dict[str, Any]]:
-    verified_only = resolve_verified_only(db, data_scope)
+    scope = resolve_scope(db, data_scope)
     props = filter_properties(
-        query_properties(db, verified_only=verified_only),
+        query_properties(db, scope=scope),
         q=q,
         stage=stage,
         min_score=min_score,
@@ -215,8 +227,8 @@ def get_owner_profiles(
     limit: int | None = None,
     data_scope: str | None = None,
 ) -> list[dict[str, Any]]:
-    verified_only = resolve_verified_only(db, data_scope)
-    props = filter_properties(query_properties(db, verified_only=verified_only), intrust_mode=intrust_mode)
+    scope = resolve_scope(db, data_scope)
+    props = filter_properties(query_properties(db, scope=scope), intrust_mode=intrust_mode)
     grouped: dict[str, list[Property]] = defaultdict(list)
     for prop in props:
         grouped[prop.owner_name].append(prop)

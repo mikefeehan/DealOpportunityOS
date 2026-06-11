@@ -107,10 +107,11 @@ export function getReviewQueue(includeVerified = false) {
   );
 }
 
-export async function importUniverse(file: File, sourceName: string): Promise<ImportSummary> {
+export async function importUniverse(file: File, sourceName: string, enrichParcels = false): Promise<ImportSummary> {
   const form = new FormData();
   form.append("file", file);
   form.append("source_name", sourceName);
+  form.append("enrich_parcels", String(enrichParcels));
   try {
     const response = await fetch(`${API_BASE}/api/import/universe`, { method: "POST", body: form });
     const body = (await response.json().catch(() => null)) as ImportSummary | { detail?: string } | null;

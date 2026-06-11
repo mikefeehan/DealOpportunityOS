@@ -577,6 +577,10 @@ def upsert_property(db: Session, payload: dict) -> Property:
     if not prop.pipeline:
         db.add(Pipeline(property_id=prop.id, stage="Identified", notes=""))
 
+    # Flush so the score/pipeline are visible if the same property is upserted
+    # again within an uncommitted batch (e.g. duplicate parcel ids in one import).
+    db.flush()
+
     return prop
 
 
