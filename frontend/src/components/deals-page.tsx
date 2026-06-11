@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowUpDown, FileText, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { exportUrl, getOpportunities } from "@/lib/api";
+import { exportUrl, getOpportunities, EXPORTS_ENABLED } from "@/lib/api";
 import type { PropertyOpportunity } from "@/lib/types";
 import { ownerHref } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -100,12 +100,14 @@ export function DealsPage() {
       <PageHeading eyebrow="Deal Finder" title="All Deals">
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted">{filtered.length} of {rows.length}</span>
-          <Button asChild variant="secondary">
-            <a href={exportUrl("/api/export/deals.xlsx")}>
-              <FileText size={15} />
-              Excel
-            </a>
-          </Button>
+          {EXPORTS_ENABLED && (
+            <Button asChild variant="secondary">
+              <a href={exportUrl("/api/export/deals.xlsx")}>
+                <FileText size={15} />
+                Excel
+              </a>
+            </Button>
+          )}
         </div>
       </PageHeading>
 

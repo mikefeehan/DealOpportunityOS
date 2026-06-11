@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { BarChart3, Download, FileText, Flame, LayoutGrid, ListChecks, MapPin, PhoneCall, Radar, RefreshCw, TrendingUp, UploadCloud, Users } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
-import { scanTucson, exportUrl, getMarkets, getSelectedMarket, getSummary, setSelectedMarket } from "@/lib/api";
+import { scanTucson, exportUrl, getMarkets, getSelectedMarket, getSummary, setSelectedMarket, EXPORTS_ENABLED } from "@/lib/api";
 import type { MarketOption } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -119,22 +119,26 @@ export function AppShell({ children }: { children: ReactNode }) {
                   ))}
                 </select>
               )}
-              <Button variant="secondary" onClick={runScan} disabled={scanning}>
-                <RefreshCw size={15} className={scanning ? "animate-spin" : ""} />
-                {scanLabel}
-              </Button>
-              <Button asChild variant="secondary">
-                <a href={exportUrl("/api/export/csv")}>
-                  <Download size={15} />
-                  CSV
-                </a>
-              </Button>
-              <Button asChild>
-                <a href={exportUrl("/api/export/today-call-list.xlsx")}>
-                  <FileText size={15} />
-                  Call List Excel
-                </a>
-              </Button>
+              {EXPORTS_ENABLED && (
+                <>
+                  <Button variant="secondary" onClick={runScan} disabled={scanning}>
+                    <RefreshCw size={15} className={scanning ? "animate-spin" : ""} />
+                    {scanLabel}
+                  </Button>
+                  <Button asChild variant="secondary">
+                    <a href={exportUrl("/api/export/csv")}>
+                      <Download size={15} />
+                      CSV
+                    </a>
+                  </Button>
+                  <Button asChild>
+                    <a href={exportUrl("/api/export/today-call-list.xlsx")}>
+                      <FileText size={15} />
+                      Call List Excel
+                    </a>
+                  </Button>
+                </>
+              )}
             </div>
           </div>
           {provenance && provenance.fallback_records > 0 && (

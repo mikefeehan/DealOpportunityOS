@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowUpDown, Building2, FileText, Flame } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { exportUrl, getDebtWatch } from "@/lib/api";
+import { exportUrl, getDebtWatch, EXPORTS_ENABLED } from "@/lib/api";
 import type { PropertyOpportunity } from "@/lib/types";
 import { formatMoney, formatNumber, ownerHref } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -98,12 +98,14 @@ export function DebtWatchPage() {
             <Flame size={16} className="text-red" />
             Ranked by debt pressure
           </span>
-          <Button asChild variant="secondary">
-            <a href={exportUrl("/api/export/maturing-debt.xlsx")}>
-              <FileText size={15} />
-              Debt Excel
-            </a>
-          </Button>
+          {EXPORTS_ENABLED && (
+            <Button asChild variant="secondary">
+              <a href={exportUrl("/api/export/maturing-debt.xlsx")}>
+                <FileText size={15} />
+                Debt Excel
+              </a>
+            </Button>
+          )}
         </div>
       </PageHeading>
 
