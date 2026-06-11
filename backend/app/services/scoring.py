@@ -188,6 +188,46 @@ def score_contactability(mailing_address: str, owner_name: str) -> float:
     return clamp(score)
 
 
+_GRADE_SCORES = {
+    "A+": 98, "A": 94, "A-": 88, "B+": 82, "B": 76, "B-": 70,
+    "C+": 62, "C": 56, "C-": 50, "D": 40, "F": 25, "NR": 60,
+}
+
+
+def grade_to_score(grade: str) -> float:
+    return _GRADE_SCORES.get((grade or "").upper().strip(), 60)
+
+
+def score_quality(star_rating: float, building_class: str) -> float:
+    """Asset quality fit for value-add multifamily.
+
+    B/C class and 2-3 star are the value-add sweet spot; A/luxury and 5-star are
+    too expensive (thin upside), 1-star is too distressed.
+    """
+    cls = (building_class or "").upper()[:1]
+    base = {"B": 90, "C": 80, "A": 55, "D": 50, "F": 45}.get(cls, 70)
+    if star_rating:
+        star = {1: 50, 2: 82, 3: 92, 4: 68, 5: 48}.get(int(round(star_rating)), 70)
+        base = round((base + star) / 2)
+    return float(base)
+
+
+def loan_maturity_pressure(loan_maturity_year: int, current_year: int) -> float:
+    """0-100 motivation signal: debt coming due is a strong reason to transact."""
+    if not loan_maturity_year:
+        return 0.0
+    years = loan_maturity_year - current_year
+    if years <= 0:
+        return 90.0  # matured / past due
+    if years <= 1:
+        return 100.0
+    if years <= 2:
+        return 80.0
+    if years <= 3:
+        return 60.0
+    return 0.0
+
+
 def calculate_market_value(prop: Property) -> float:
     if not prop.units or not prop.market_rent:
         return prop.assessed_value
@@ -217,20 +257,16 @@ def calculate_fit_score(
     vintage_score: float,
     rent_gap_score: float,
     basis_gap_score: float,
-    owner_state: str,
+    asset_score: float,
     year_built: int,
 ) -> float:
-    market_score = 100
-    state = (owner_state or "").upper()
-    if state and state not in TARGET_OWNER_STATES:
-        market_score = 70
     luxury_penalty = 18 if year_built > 2018 else 0
     score = (
-        units_score * 0.30
-        + vintage_score * 0.20
-        + rent_gap_score * 0.25
-        + basis_gap_score * 0.15
-        + market_score * 0.10
+        units_score * 0.26
+        + vintage_score * 0.18
+        + rent_gap_score * 0.22
+        + basis_gap_score * 0.14
+        + asset_score * 0.20
         - luxury_penalty
     )
     return round(clamp(score), 1)
@@ -243,6 +279,7 @@ def calculate_motivation_score(
     contactability_score: float,
     potential_721: bool,
     recent_trade: bool,
+    loan_pressure: float = 0.0,
 ) -> float:
     score = (
         hold_period_score * 0.34
@@ -253,15 +290,18 @@ def calculate_motivation_score(
     )
     if recent_trade:
         score -= 24
+    # Debt coming due is added pressure on top of the base motivation profile.
+    score += loan_pressure * 0.12
     return round(clamp(score), 1)
 
 
 def recommendation_for(call_score: float, fit_score: float, motivation_score: float, potential_721: bool) -> str:
-    if call_score >= 88.5 and fit_score >= 86 and motivation_score >= 87:
+    # Owner-first: a motivated owner of a fitting asset is the trigger. Calibrated
+    # to the real (post-HelloData/CoStar) score distribution, where honest rent
+    # gaps put top opportunities in the high-70s/80s rather than the inflated 90s.
+    if (call_score >= 78 and motivation_score >= 84) or (potential_721 and call_score >= 80):
         return "Call Owner"
-    if potential_721 and call_score >= 90:
-        return "Call Owner"
-    if call_score >= 58:
+    if call_score >= 55:
         return "Monitor"
     return "Ignore"
 
@@ -272,6 +312,10 @@ def calculate_score(prop: Property, current_year: int | None = None) -> ScoreRes
     rent_gap = 0.0
     if prop.market_rent:
         rent_gap = clamp((prop.market_rent - prop.average_rent) / prop.market_rent * 100, 0, 55)
+    # Rent-restricted / affordable assets can't mark to market — the upside is not
+    # realizable, so don't reward it.
+    if getattr(prop, "affordable", False):
+        rent_gap = 0.0
     basis_gap = calculate_basis_gap(prop)
 
     hold_period_score = score_hold_period(hold_period)
@@ -298,12 +342,18 @@ def calculate_score(prop: Property, current_year: int | None = None) -> ScoreRes
     potential_721 = bool(hold_period > 15 and basis_gap > 12 and is_721_owner_type(prop.owner_name))
     recent_trade = hold_period < 5
 
+    asset_score = score_quality(getattr(prop, "star_rating", 0) or 0, getattr(prop, "building_class", "") or "")
+    location_rating = getattr(prop, "location_rating", "") or ""
+    if location_rating:
+        asset_score = round((asset_score + grade_to_score(location_rating)) / 2)
+    loan_pressure = loan_maturity_pressure(getattr(prop, "loan_maturity_year", 0) or 0, year)
+
     fit_score = calculate_fit_score(
         units_score=units_score,
         vintage_score=vintage_score,
         rent_gap_score=rent_gap_score,
         basis_gap_score=basis_gap_score,
-        owner_state=prop.owner_state,
+        asset_score=asset_score,
         year_built=prop.year_built,
     )
     motivation_score = calculate_motivation_score(
@@ -313,6 +363,7 @@ def calculate_score(prop: Property, current_year: int | None = None) -> ScoreRes
         contactability_score=contactability_score,
         potential_721=potential_721,
         recent_trade=recent_trade,
+        loan_pressure=loan_pressure,
     )
     call_score = round((fit_score * 0.5) + (motivation_score * 0.5), 1)
     recommendation = recommendation_for(call_score, fit_score, motivation_score, potential_721)

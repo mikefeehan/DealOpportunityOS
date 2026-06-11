@@ -42,6 +42,25 @@ class Property(Base):
     matched_address: Mapped[str] = mapped_column(String(255), default="")
     last_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    # Cross-source aggregation + enrichment (CoStar/Yardi/HelloData merged per site).
+    address_key: Mapped[str] = mapped_column(String(160), default="", index=True)
+    market: Mapped[str] = mapped_column(String(120), default="Tucson, AZ", index=True)
+    sources: Mapped[str] = mapped_column(String(255), default="")
+    star_rating: Mapped[float] = mapped_column(Float, default=0)
+    building_class: Mapped[str] = mapped_column(String(8), default="")
+    location_rating: Mapped[str] = mapped_column(String(16), default="")
+    cap_rate: Mapped[float] = mapped_column(Float, default=0)
+    vacancy: Mapped[float] = mapped_column(Float, default=0)
+    for_sale: Mapped[bool] = mapped_column(Boolean, default=False)
+    for_sale_price: Mapped[float] = mapped_column(Float, default=0)
+    price_per_unit: Mapped[float] = mapped_column(Float, default=0)
+    last_sale_price: Mapped[float] = mapped_column(Float, default=0)
+    affordable: Mapped[bool] = mapped_column(Boolean, default=False)
+    affordable_type: Mapped[str] = mapped_column(String(48), default="")
+    loan_maturity_year: Mapped[int] = mapped_column(Integer, default=0)
+    year_renovated: Mapped[int] = mapped_column(Integer, default=0)
+    effective_rent: Mapped[float] = mapped_column(Float, default=0)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

@@ -551,13 +551,49 @@ SEEDED_PROPERTIES = [
 ]
 
 
-def upsert_property(db: Session, payload: dict) -> Property:
+# Fields where a newer source should overwrite an existing value (financials,
+# ratings, physical facts). Everything else is fill-only (keep the first source),
+# which preserves stable owner grouping and identity across merges.
+_MERGE_OVERWRITE = {
+    "star_rating", "building_class", "location_rating", "cap_rate", "vacancy", "for_sale",
+    "for_sale_price", "price_per_unit", "last_sale_price", "affordable", "affordable_type",
+    "loan_maturity_year", "year_renovated", "effective_rent", "market", "submarket",
+    "year_built", "last_sale_year", "market_rent", "building_sqft", "property_type",
+    "match_status", "match_confidence", "matched_address", "data_status",
+}
+_KEEP_IDENTITY = {"parcel_id", "address_key", "created_at", "sources"}
+
+
+def _empty(value) -> bool:
+    return value in (None, "", 0, 0.0, False)
+
+
+def _merge_payload(existing: Property, payload: dict) -> None:
+    for key, value in payload.items():
+        if key in _KEEP_IDENTITY or _empty(value):
+            continue
+        if _empty(getattr(existing, key, None)) or key in _MERGE_OVERWRITE:
+            setattr(existing, key, value)
+    new_source = payload.get("sources") or payload.get("source_name")
+    if new_source and new_source not in (existing.sources or ""):
+        existing.sources = ", ".join(part for part in [existing.sources, new_source] if part)
+
+
+def upsert_property(db: Session, payload: dict, merge: bool = False) -> Property:
     payload = {**payload}
     payload.setdefault("building_sqft", int((payload.get("units") or 0) * 875))
-    existing = db.scalar(select(Property).where(Property.parcel_id == payload["parcel_id"]))
+    existing = None
+    address_key = payload.get("address_key")
+    if address_key:
+        existing = db.scalar(select(Property).where(Property.address_key == address_key))
+    if not existing:
+        existing = db.scalar(select(Property).where(Property.parcel_id == payload["parcel_id"]))
     if existing:
-        for key, value in payload.items():
-            setattr(existing, key, value)
+        if merge:
+            _merge_payload(existing, payload)
+        else:
+            for key, value in payload.items():
+                setattr(existing, key, value)
         prop = existing
     else:
         prop = Property(**payload)

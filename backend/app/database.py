@@ -40,6 +40,23 @@ _ADDED_PROPERTY_COLUMNS = {
     "match_confidence": "FLOAT DEFAULT 0",
     "matched_address": "VARCHAR(255) DEFAULT ''",
     "last_verified_at": "DATETIME",
+    "address_key": "VARCHAR(160) DEFAULT ''",
+    "market": "VARCHAR(120) DEFAULT 'Tucson, AZ'",
+    "sources": "VARCHAR(255) DEFAULT ''",
+    "star_rating": "FLOAT DEFAULT 0",
+    "building_class": "VARCHAR(8) DEFAULT ''",
+    "location_rating": "VARCHAR(16) DEFAULT ''",
+    "cap_rate": "FLOAT DEFAULT 0",
+    "vacancy": "FLOAT DEFAULT 0",
+    "for_sale": "BOOLEAN DEFAULT 0",
+    "for_sale_price": "FLOAT DEFAULT 0",
+    "price_per_unit": "FLOAT DEFAULT 0",
+    "last_sale_price": "FLOAT DEFAULT 0",
+    "affordable": "BOOLEAN DEFAULT 0",
+    "affordable_type": "VARCHAR(48) DEFAULT ''",
+    "loan_maturity_year": "INTEGER DEFAULT 0",
+    "year_renovated": "INTEGER DEFAULT 0",
+    "effective_rent": "FLOAT DEFAULT 0",
 }
 
 

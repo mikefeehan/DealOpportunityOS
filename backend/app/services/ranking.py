@@ -4,7 +4,7 @@ from collections import defaultdict
 from statistics import mean
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from backend.app.models import OpportunityScore, Pipeline, Property
@@ -45,6 +45,22 @@ def property_to_dict(prop: Property) -> dict[str, Any]:
         "longitude": prop.longitude,
         "property_type": prop.property_type,
         "submarket": prop.submarket,
+        "market": prop.market,
+        "sources": prop.sources,
+        "star_rating": prop.star_rating,
+        "building_class": prop.building_class,
+        "location_rating": prop.location_rating,
+        "cap_rate": prop.cap_rate,
+        "vacancy": prop.vacancy,
+        "for_sale": prop.for_sale,
+        "for_sale_price": prop.for_sale_price,
+        "price_per_unit": prop.price_per_unit,
+        "last_sale_price": prop.last_sale_price,
+        "affordable": prop.affordable,
+        "affordable_type": prop.affordable_type,
+        "loan_maturity_year": prop.loan_maturity_year,
+        "year_renovated": prop.year_renovated,
+        "effective_rent": prop.effective_rent,
         "source": prop.source,
         "source_name": prop.source_name,
         "source_url": prop.source_url,
@@ -109,7 +125,7 @@ def resolve_scope(db: Session, data_scope: str | None) -> str | None:
     return None
 
 
-def query_properties(db: Session, scope: str | None = None) -> list[Property]:
+def query_properties(db: Session, scope: str | None = None, market: str | None = None) -> list[Property]:
     stmt = (
         select(Property)
         .options(joinedload(Property.score), joinedload(Property.pipeline))
@@ -122,7 +138,20 @@ def query_properties(db: Session, scope: str | None = None) -> list[Property]:
         stmt = stmt.where(Property.match_status == "verified", Property.data_status != "seeded_fallback")
     elif scope == "live":
         stmt = stmt.where(Property.data_status != "seeded_fallback")
+    if market:
+        stmt = stmt.where(Property.market == market)
     return list(db.scalars(stmt).all())
+
+
+def list_markets(db: Session) -> list[dict[str, Any]]:
+    stmt = (
+        select(Property.market, func.count(Property.id))
+        .where(Property.data_status != "seeded_fallback")
+        .where(Property.units >= 50)
+        .group_by(Property.market)
+        .order_by(func.count(Property.id).desc())
+    )
+    return [{"market": market or "Unknown", "properties": count} for market, count in db.execute(stmt).all()]
 
 
 def passes_intrust_mode(prop: Property) -> bool:
@@ -181,10 +210,11 @@ def get_ranked_properties(
     recommendation: str | None = None,
     limit: int | None = None,
     data_scope: str | None = None,
+    market: str | None = None,
 ) -> list[dict[str, Any]]:
     scope = resolve_scope(db, data_scope)
     props = filter_properties(
-        query_properties(db, scope=scope),
+        query_properties(db, scope=scope, market=market),
         q=q,
         stage=stage,
         min_score=min_score,
@@ -227,9 +257,10 @@ def get_owner_profiles(
     intrust_mode: bool = False,
     limit: int | None = None,
     data_scope: str | None = None,
+    market: str | None = None,
 ) -> list[dict[str, Any]]:
     scope = resolve_scope(db, data_scope)
-    props = filter_properties(query_properties(db, scope=scope), intrust_mode=intrust_mode)
+    props = filter_properties(query_properties(db, scope=scope, market=market), intrust_mode=intrust_mode)
     grouped: dict[str, list[Property]] = defaultdict(list)
     for prop in props:
         grouped[prop.owner_name].append(prop)
@@ -279,9 +310,9 @@ def get_owner_profiles(
             "estimated_tax_deferral": estimated_tax_deferral,
             "recommendation": (
                 "Call Owner"
-                if (avg_call >= 88.5 and avg_fit >= 86 and avg_motivation >= 87) or (potential_721 and avg_call >= 90)
+                if (avg_call >= 78 and avg_motivation >= 84) or (potential_721 and avg_call >= 80)
                 else "Monitor"
-                if avg_call >= 58
+                if avg_call >= 55
                 else "Ignore"
             ),
             "top_property": property_to_dict(top_asset),
@@ -306,9 +337,43 @@ def get_owner_profile(db: Session, owner_name: str) -> dict[str, Any] | None:
     return None
 
 
-def get_market_summary(db: Session) -> dict[str, Any]:
-    props = query_properties(db)
-    owners = get_owner_profiles(db)
+def get_map_points(db: Session, data_scope: str | None = None, market: str | None = None) -> list[dict[str, Any]]:
+    """Lightweight geo payload for the map: only sites with real coordinates."""
+    scope = resolve_scope(db, data_scope)
+    points: list[dict[str, Any]] = []
+    for prop in query_properties(db, scope=scope, market=market):
+        if abs(prop.latitude or 0) < 0.1 or abs(prop.longitude or 0) < 0.1:
+            continue
+        score = prop.score
+        points.append(
+            {
+                "id": prop.id,
+                "name": prop.name,
+                "address": prop.address,
+                "owner_name": prop.owner_name,
+                "lat": prop.latitude,
+                "lon": prop.longitude,
+                "units": prop.units,
+                "year_built": prop.year_built,
+                "submarket": prop.submarket,
+                "market": prop.market,
+                "star_rating": prop.star_rating,
+                "building_class": prop.building_class,
+                "affordable": prop.affordable,
+                "for_sale": prop.for_sale,
+                "call_score": score.call_score if score else 0,
+                "recommendation": score.recommendation if score else "Monitor",
+                "rent_gap": score.rent_gap if score else 0,
+                "hold_period": score.hold_period if score else 0,
+                "potential_721_candidate": score.potential_721_candidate if score else False,
+            }
+        )
+    return points
+
+
+def get_market_summary(db: Session, market: str | None = None) -> dict[str, Any]:
+    props = query_properties(db, market=market)
+    owners = get_owner_profiles(db, market=market)
     scores = [prop.score for prop in props if prop.score]
     pipeline_rows = list(db.scalars(select(Pipeline)).all())
     stage_counts = {stage: 0 for stage in PIPELINE_STAGES}
@@ -387,16 +452,16 @@ def get_market_summary(db: Session) -> dict[str, Any]:
     }
 
 
-def get_today_call_list(db: Session, data_scope: str | None = None) -> dict[str, Any]:
-    top_owners = get_owner_profiles(db, intrust_mode=True, limit=25, data_scope=data_scope)
+def get_today_call_list(db: Session, data_scope: str | None = None, market: str | None = None) -> dict[str, Any]:
+    top_owners = get_owner_profiles(db, intrust_mode=True, limit=25, data_scope=data_scope, market=market)
     if len(top_owners) < 10:
-        top_owners = get_owner_profiles(db, intrust_mode=False, limit=25, data_scope=data_scope)
-    top_properties = get_ranked_properties(db, intrust_mode=True, limit=25, data_scope=data_scope)
+        top_owners = get_owner_profiles(db, intrust_mode=False, limit=25, data_scope=data_scope, market=market)
+    top_properties = get_ranked_properties(db, intrust_mode=True, limit=25, data_scope=data_scope, market=market)
     if len(top_properties) < 10:
-        top_properties = get_ranked_properties(db, intrust_mode=False, limit=25, data_scope=data_scope)
+        top_properties = get_ranked_properties(db, intrust_mode=False, limit=25, data_scope=data_scope, market=market)
     new_opportunities = [
         prop
-        for prop in get_ranked_properties(db, recommendation="Call Owner", limit=25, data_scope=data_scope)
+        for prop in get_ranked_properties(db, recommendation="Call Owner", limit=25, data_scope=data_scope, market=market)
         if prop["stage"] in {"Identified", "Research"}
     ][:10]
     return {

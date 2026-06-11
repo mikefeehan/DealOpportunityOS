@@ -23,6 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.models import Property
+from backend.app.services.addresses import address_key as compute_address_key
 from backend.app.services.market_reference import market_rent_benchmark, market_rent_for
 from backend.app.services.scanner import _lookup_pima_by_address
 from backend.app.services.seed_data import purge_seed_data, upsert_property
@@ -37,25 +38,44 @@ except Exception:  # noqa: BLE001
 COLUMN_ALIASES: dict[str, list[str]] = {
     "external_id": ["propertyid", "yardipropertyid", "externalid", "sourceid", "apn", "parcelnumber", "parcelid"],
     "name": ["propertyname", "property", "name", "community", "communityname", "apartmentname", "buildingname", "asset", "assetname"],
-    "address": ["address", "propertyaddress", "siteaddress", "streetaddress", "location", "fulladdress", "addr"],
+    "address": ["propertyaddress", "address", "siteaddress", "streetaddress", "location", "fulladdress", "addr"],
     "city": ["propertycity", "sitecity", "city"],
     "prop_state": ["propertystate", "sitestate", "state"],
     "zip": ["zip", "zipcode", "postalcode", "propertyzip", "sitezip"],
-    "submarket": ["submarket", "submkt"],
-    "status": ["propertyspecialstatus", "specialstatus", "propertystatus", "status", "constructionstatus"],
-    "units": ["units", "unitcount", "nounits", "noofunits", "totalunits", "numberofunits", "unit", "doors"],
+    "market": ["marketname", "market", "metro", "msa"],
+    "submarket": ["submarketname", "submarket", "submkt"],
+    "status": ["propertyspecialstatus", "specialstatus", "buildingstatus", "propertystatus", "status", "constructionstatus"],
+    "units": ["numberofunits", "units", "unitcount", "nounits", "noofunits", "totalunits", "unit", "doors"],
     "year_built": ["yearbuilt", "built", "yrbuilt", "vintage", "yearbuiltoriginal", "constructionyear", "completiondate", "yearcompleted", "completionyear"],
-    "average_rent": ["averagerent", "avgrent", "currentrent", "inplacerent", "rent", "effectiverent", "actualrent", "latestmonthlyrent", "monthlyrent", "avgmarketrent"],
-    "market_rent": ["marketrent", "proformarent", "achievablerent", "askingrent", "targetrent"],
+    "year_renovated": ["yearrenovated", "renovated", "yearreno"],
+    "average_rent": ["averagerent", "avgrent", "currentrent", "inplacerent", "latestmonthlyrent", "monthlyrent", "actualrent"],
+    "market_rent": ["marketrent", "proformarent", "achievablerent", "targetrent"],
+    "effective_rent": ["avgeffectiveunit", "effectiverentunit", "avgeffectiverent", "effectiverent"],
+    "asking_rent": ["avgaskingunit", "askingrentunit", "avgaskingrent", "askingrent"],
     "owner_name": ["owner", "ownername", "ownership", "ownershipentity", "trueowner"],
     "owner_city": ["ownercity", "mailingcity"],
     "owner_state": ["ownerstate", "mailingstate", "ownerst"],
+    "latitude": ["latitude", "lat"],
+    "longitude": ["longitude", "lon", "lng", "long"],
     "last_sale_year": ["lastsaleyear", "yearpurchased", "saleyear", "acquired", "acquisitionyear", "purchaseyear", "latestsaledate", "saledate", "lastsaledate"],
+    "last_sale_price": ["lastsaleprice", "saleprice", "latestsaleprice"],
+    "star_rating": ["starrating", "stars"],
+    "building_class": ["buildingclass", "class"],
+    "location_rating": ["locrating", "locationrating"],
+    "cap_rate": ["caprate"],
+    "vacancy": ["vacancy", "vacancypct", "vacancyrate"],
+    "for_sale_status": ["forsalestatus", "forsale"],
+    "for_sale_price": ["forsaleprice"],
+    "price_per_unit": ["forsalepriceperunit", "priceperunit", "saleperunit"],
+    "affordable_type": ["affordabletype"],
+    "rent_type": ["renttype"],
+    "loan_maturity": ["maturitydate", "loanmaturitydate", "loanmaturity"],
     "source": ["source", "datasource", "provider"],
 }
 
 REQUIRED_ANY = ["address", "name"]  # need at least one identifier
 DEFAULT_LAST_SALE_YEAR = 2012  # neutral placeholder when an import omits sale year
+DEFAULT_MARKET = "Tucson, AZ"
 
 # Modeled Tucson submarket market-rent benchmarks ($/unit/mo). These are estimates
 # used to derive rent upside when an export lacks a market/pro-forma rent column.
@@ -149,6 +169,10 @@ def _to_float(value: Any) -> float:
         return float(match.group(0).replace(",", ""))
     except ValueError:
         return 0.0
+
+
+def _to_bool_yes(value: Any) -> bool:
+    return str(value or "").strip().upper() in {"Y", "YES", "TRUE", "1"}
 
 
 def _to_year(value: Any) -> int:
@@ -413,60 +437,108 @@ def import_universe(
         # only when neither a sale date nor a build year is available.
         last_sale_year = _to_year(get(row, "last_sale_year")) or year_built or DEFAULT_LAST_SALE_YEAR
         submarket = get(row, "submarket").strip() or "Tucson"
+        market = get(row, "market").strip() or DEFAULT_MARKET
+        # Normalize "Tucson" / "Tucson, AZ" to one label so markets don't fragment.
+        if market and "," not in market and prop_state:
+            market = f"{market}, {prop_state.upper()}"
         status = get(row, "status").strip()
+
+        # Rents: in-place (average) from a rent-roll source; market/effective from
+        # CoStar (effective) or HelloData (asking). Effective is already net of
+        # concessions; asking-derived market rents get discounted to net-effective.
         average_rent = _to_float(get(row, "average_rent"))
-        market_rent = _to_float(get(row, "market_rent"))
+        explicit_market = _to_float(get(row, "market_rent"))
+        effective_rent = _to_float(get(row, "effective_rent"))
+        asking_rent = _to_float(get(row, "asking_rent"))
+        market_rent = explicit_market or effective_rent
         if market_rent and not average_rent:
             average_rent = round(market_rent * 0.82, 0)
         if not market_rent:
-            # Prefer a real HelloData market rent matched on address; otherwise a
-            # modeled submarket benchmark. In-place (average) rent comes from the
-            # export; if it's missing but we have a HelloData rent, use it as the
-            # current rent so the property still shows a figure (no upside signal).
             hellodata_rent = market_rent_for(address)
             if hellodata_rent:
-                market_rent = hellodata_rent
+                market_rent = round(hellodata_rent * NET_EFFECTIVE_FACTOR)
                 if not average_rent:
                     average_rent = hellodata_rent
+            elif asking_rent:
+                market_rent = round(asking_rent * NET_EFFECTIVE_FACTOR)
             elif average_rent and average_rent > 0:
-                market_rent = estimate_market_rent(submarket, average_rent, year_built)
-            # Discount asking market rent to net-effective so rent gaps reflect
-            # what an owner actually collects, not the advertised number.
-            if market_rent:
-                market_rent = round(market_rent * NET_EFFECTIVE_FACTOR)
-        assessed_value = _to_float(pima.get("assessed_value", 0)) or units * 95_000
+                market_rent = round(estimate_market_rent(submarket, average_rent, year_built) * NET_EFFECTIVE_FACTOR)
+        effective_rent = effective_rent or market_rent
+
+        # Quality / location ratings
+        star_rating = _to_float(get(row, "star_rating"))
+        building_class = get(row, "building_class").strip().upper()[:4]
+        location_rating = get(row, "location_rating").strip()[:12]
+
+        # Affordable / rent-restricted -> upside is not realizable
+        affordable_type = get(row, "affordable_type").strip()
+        rent_type = get(row, "rent_type").strip().lower()
+        affordable = bool(affordable_type) or any(
+            token in rent_type for token in ("afford", "subsid", "restrict")
+        ) or any(token in status.lower() for token in ("afford", "subsid", "restrict", "lihtc"))
+
+        # Sale / valuation / debt / operations
+        last_sale_price = _to_float(get(row, "last_sale_price"))
+        price_per_unit = _to_float(get(row, "price_per_unit"))
+        cap_rate = _to_float(get(row, "cap_rate"))
+        vacancy = _to_float(get(row, "vacancy"))
+        for_sale_price = _to_float(get(row, "for_sale_price"))
+        for_sale = _to_bool_yes(get(row, "for_sale_status")) or for_sale_price > 0
+        loan_maturity_year = _to_year(get(row, "loan_maturity"))
+        year_renovated = _to_year(get(row, "year_renovated"))
+
+        latitude = _to_float(get(row, "latitude")) or _to_float(pima.get("latitude", 0)) or 0.0
+        longitude = _to_float(get(row, "longitude")) or _to_float(pima.get("longitude", 0)) or 0.0
+        assessed_value = _to_float(pima.get("assessed_value", 0)) or last_sale_price or units * 95_000
         row_source = get(row, "source").strip()
         property_type = "Under Construction" if _is_preopen(status, year_built, datetime.utcnow().year) else "Apartments"
 
         payload = {
             "parcel_id": parcel_id,
+            "address_key": compute_address_key(address),
+            "market": market,
             "name": name or address.split(",")[0],
-            "address": address or f"{name}, Tucson, AZ",
+            "address": address or f"{name}, {market}",
             "units": units,
             "year_built": year_built,
+            "year_renovated": year_renovated,
             "building_sqft": int(units * 875),
             "assessed_value": assessed_value,
             "owner_name": get(row, "owner_name").strip() or pima.get("owner_name") or "Owner pending parcel match",
             "mailing_address": pima.get("mailing_address") or "Mailing address pending parcel match",
-            "latitude": pima.get("latitude") or 32.2226,
-            "longitude": pima.get("longitude") or -110.9747,
+            "latitude": latitude,
+            "longitude": longitude,
             "property_type": property_type,
             "submarket": submarket,
             "owner_city": get(row, "owner_city").strip() or pima.get("owner_city") or "",
             "owner_state": (get(row, "owner_state").strip() or pima.get("owner_state") or "").upper(),
             "source": f"{source_label}: {row_source}" if row_source else source_label,
             "source_name": source_label,
+            "sources": source_label,
             "source_url": "",
             "last_sale_year": last_sale_year,
+            "last_sale_price": last_sale_price,
             "average_rent": average_rent,
             "market_rent": market_rent,
+            "effective_rent": effective_rent,
+            "star_rating": star_rating,
+            "building_class": building_class,
+            "location_rating": location_rating,
+            "cap_rate": cap_rate,
+            "vacancy": vacancy,
+            "for_sale": for_sale,
+            "for_sale_price": for_sale_price,
+            "price_per_unit": price_per_unit,
+            "affordable": affordable,
+            "affordable_type": affordable_type,
+            "loan_maturity_year": loan_maturity_year,
             "data_status": "live_authorized",
             "match_status": match_status,
             "match_confidence": confidence,
             "matched_address": matched_address if match_status != "no_match" else "",
             "last_verified_at": datetime.utcnow() if match_status == "verified" else None,
         }
-        upsert_property(db, payload)
+        upsert_property(db, payload, merge=True)
 
         summary["imported"] += 1
         summary[match_status if match_status in {"needs_review", "verified", "no_match"} else "needs_review"] += 1

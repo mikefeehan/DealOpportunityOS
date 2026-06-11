@@ -16,11 +16,13 @@ from backend.app.services.exports import build_opportunities_csv, build_today_ca
 from backend.app.services.importer import import_universe
 from backend.app.services.market_context import load_market_context
 from backend.app.services.ranking import (
+    get_map_points,
     get_market_summary,
     get_owner_profile,
     get_owner_profiles,
     get_ranked_properties,
     get_today_call_list,
+    list_markets,
     property_to_dict,
 )
 from backend.app.services.review import confirm_match, get_review_queue, reject_record
@@ -73,8 +75,8 @@ def scan_tucson(db: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/api/market/summary")
-def market_summary(db: Session = Depends(get_db)) -> dict:
-    return get_market_summary(db)
+def market_summary(market: str | None = Query(None), db: Session = Depends(get_db)) -> dict:
+    return get_market_summary(db, market=market)
 
 
 @app.get("/api/market/context")
@@ -82,9 +84,27 @@ def market_context() -> dict:
     return load_market_context()
 
 
+@app.get("/api/markets")
+def markets(db: Session = Depends(get_db)) -> list[dict]:
+    return list_markets(db)
+
+
+@app.get("/api/map")
+def map_points(
+    data_scope: str | None = Query(None),
+    market: str | None = Query(None),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    return get_map_points(db, data_scope=data_scope, market=market)
+
+
 @app.get("/api/today-call-list")
-def today_call_list(data_scope: str | None = Query(None), db: Session = Depends(get_db)) -> dict:
-    return get_today_call_list(db, data_scope=data_scope)
+def today_call_list(
+    data_scope: str | None = Query(None),
+    market: str | None = Query(None),
+    db: Session = Depends(get_db),
+) -> dict:
+    return get_today_call_list(db, data_scope=data_scope, market=market)
 
 
 @app.get("/api/opportunities")
@@ -95,6 +115,7 @@ def opportunities(
     min_score: float | None = None,
     intrust_mode: bool = Query(False),
     data_scope: str | None = Query(None),
+    market: str | None = Query(None),
     limit: int | None = Query(None, ge=1, le=500),
     db: Session = Depends(get_db),
 ) -> list[dict]:
@@ -107,6 +128,7 @@ def opportunities(
         recommendation=recommendation,
         limit=limit,
         data_scope=data_scope,
+        market=market,
     )
 
 
@@ -114,10 +136,11 @@ def opportunities(
 def owners(
     intrust_mode: bool = Query(False),
     data_scope: str | None = Query(None),
+    market: str | None = Query(None),
     limit: int | None = Query(None, ge=1, le=500),
     db: Session = Depends(get_db),
 ) -> list[dict]:
-    return get_owner_profiles(db, intrust_mode=intrust_mode, limit=limit, data_scope=data_scope)
+    return get_owner_profiles(db, intrust_mode=intrust_mode, limit=limit, data_scope=data_scope, market=market)
 
 
 @app.post("/api/import/universe")

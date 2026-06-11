@@ -7,7 +7,9 @@ import {
 import type {
   CallPrep,
   ImportSummary,
+  MapPoint,
   MarketContext,
+  MarketOption,
   MarketSummary,
   OwnerProfile,
   PipelinePayload,
@@ -21,6 +23,26 @@ import type {
 // base makes every request fail (GETs silently fall back, uploads surface
 // "Failed to fetch"). Override with NEXT_PUBLIC_API_BASE when needed.
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://127.0.0.1:8000";
+export const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
+
+const MARKET_KEY = "oos.selectedMarket";
+
+export function getSelectedMarket(): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(MARKET_KEY) || "";
+}
+
+export function setSelectedMarket(market: string) {
+  if (typeof window === "undefined") return;
+  if (market) window.localStorage.setItem(MARKET_KEY, market);
+  else window.localStorage.removeItem(MARKET_KEY);
+}
+
+function withMarket(params: URLSearchParams) {
+  const market = getSelectedMarket();
+  if (market) params.set("market", market);
+  return params;
+}
 
 export function exportUrl(path: string) {
   return `${API_BASE}${path}`;
@@ -48,12 +70,26 @@ async function fetchJson<T>(path: string, fallback: T, init?: RequestInit): Prom
 export function getTodayCallList(dataScope?: string) {
   const params = new URLSearchParams();
   if (dataScope) params.set("data_scope", dataScope);
+  withMarket(params);
   const query = params.toString();
   return fetchJson<TodayCallList>(`/api/today-call-list${query ? `?${query}` : ""}`, fallbackToday);
 }
 
 export function getSummary() {
-  return fetchJson<MarketSummary>("/api/market/summary", fallbackSummary);
+  const query = withMarket(new URLSearchParams()).toString();
+  return fetchJson<MarketSummary>(`/api/market/summary${query ? `?${query}` : ""}`, fallbackSummary);
+}
+
+export function getMarkets() {
+  return fetchJson<MarketOption[]>("/api/markets", []);
+}
+
+export function getMapPoints(dataScope?: string) {
+  const params = new URLSearchParams();
+  if (dataScope) params.set("data_scope", dataScope);
+  withMarket(params);
+  const query = params.toString();
+  return fetchJson<MapPoint[]>(`/api/map${query ? `?${query}` : ""}`, []);
 }
 
 export function getMarketContext() {
@@ -72,6 +108,7 @@ export function getOwners(intrustMode = false, limit?: number) {
   const params = new URLSearchParams();
   params.set("intrust_mode", String(intrustMode));
   if (limit) params.set("limit", String(limit));
+  withMarket(params);
   return fetchJson<OwnerProfile[]>(`/api/owners?${params.toString()}`, [fallbackToday.top_10_owners[0]]);
 }
 
@@ -84,6 +121,7 @@ export function getOpportunities(params: Record<string, string | number | boolea
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== "") search.set(key, String(value));
   });
+  withMarket(search);
   return fetchJson<PropertyOpportunity[]>(`/api/opportunities?${search.toString()}`, fallbackToday.top_25_properties);
 }
 

@@ -18,16 +18,10 @@ import statistics
 from functools import lru_cache
 from pathlib import Path
 
+from backend.app.services.addresses import address_key as street_key
+
 ROOT_DIR = Path(__file__).resolve().parents[3]
 MARKET_REF_DIR = ROOT_DIR / "data" / "market_reference"
-
-
-def street_key(address: str) -> str:
-    """Normalized street token (number + first two words) for fuzzy address joins."""
-    head = (address or "").split(",")[0].upper()
-    head = re.sub(r"[^A-Z0-9 ]", " ", head)
-    tokens = [t for t in head.split() if t]
-    return " ".join(tokens[:3]) if len(tokens) >= 3 else " ".join(tokens)
 
 
 def _money(value: str) -> float:

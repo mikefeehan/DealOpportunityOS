@@ -22,6 +22,22 @@ export type PropertyOpportunity = {
   longitude: number;
   property_type: string;
   submarket: string;
+  market?: string;
+  sources?: string;
+  star_rating?: number;
+  building_class?: string;
+  location_rating?: string;
+  cap_rate?: number;
+  vacancy?: number;
+  for_sale?: boolean;
+  for_sale_price?: number;
+  price_per_unit?: number;
+  last_sale_price?: number;
+  affordable?: boolean;
+  affordable_type?: string;
+  loan_maturity_year?: number;
+  year_renovated?: number;
+  effective_rent?: number;
   source: string;
   source_name: string;
   source_url: string;
@@ -106,6 +122,33 @@ export type MarketSummary = {
     deals_closed: number;
   };
   pipeline: Record<string, number>;
+};
+
+export type MapPoint = {
+  id: number;
+  name: string;
+  address: string;
+  owner_name: string;
+  lat: number;
+  lon: number;
+  units: number;
+  year_built: number;
+  submarket: string;
+  market: string;
+  star_rating: number;
+  building_class: string;
+  affordable: boolean;
+  for_sale: boolean;
+  call_score: number;
+  recommendation: string;
+  rent_gap: number;
+  hold_period: number;
+  potential_721_candidate: boolean;
+};
+
+export type MarketOption = {
+  market: string;
+  properties: number;
 };
 
 export type MarketContext = {

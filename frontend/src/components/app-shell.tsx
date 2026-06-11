@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, Building2, Download, FileText, ListChecks, PhoneCall, Radar, RefreshCw, UploadCloud, Users } from "lucide-react";
+import { BarChart3, Building2, Download, FileText, ListChecks, MapPin, PhoneCall, Radar, RefreshCw, UploadCloud, Users } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
-import { scanTucson, exportUrl, getSummary } from "@/lib/api";
+import { scanTucson, exportUrl, getMarkets, getSelectedMarket, getSummary, setSelectedMarket } from "@/lib/api";
+import type { MarketOption } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -13,6 +14,7 @@ const nav = [
   { href: "/command-center", label: "Command Center", icon: BarChart3 },
   { href: "/opportunities", label: "Opportunity Finder", icon: Radar },
   { href: "/owners", label: "Owner Intelligence", icon: Users },
+  { href: "/map", label: "Site Map", icon: MapPin },
   { href: "/pipeline", label: "Pipeline", icon: ListChecks },
   { href: "/review", label: "Import & Review", icon: UploadCloud }
 ];
@@ -28,10 +30,21 @@ export function AppShell({ children }: { children: ReactNode }) {
     fallback_records: number;
     disclaimer: string;
   } | null>(null);
+  const [markets, setMarkets] = useState<MarketOption[]>([]);
+  const [market, setMarket] = useState("");
 
   useEffect(() => {
     getSummary().then((summary) => setProvenance(summary.data_provenance));
+    getMarkets().then(setMarkets);
+    setMarket(getSelectedMarket());
   }, []);
+
+  function changeMarket(value: string) {
+    setMarket(value);
+    setSelectedMarket(value);
+    router.refresh();
+    window.location.reload();
+  }
 
   async function runScan() {
     setScanning(true);
@@ -89,6 +102,21 @@ export function AppShell({ children }: { children: ReactNode }) {
               <div className="text-lg font-semibold text-ink">Who should InTrust call this week?</div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {markets.length > 0 && (
+                <select
+                  value={market}
+                  onChange={(e) => changeMarket(e.target.value)}
+                  className="h-9 rounded-md border border-border bg-panel2 px-2 text-sm text-ink outline-none focus:border-amber/60"
+                  title="Filter by market"
+                >
+                  <option value="">All markets</option>
+                  {markets.map((m) => (
+                    <option key={m.market} value={m.market}>
+                      {m.market} ({m.properties})
+                    </option>
+                  ))}
+                </select>
+              )}
               <Button variant="secondary" onClick={runScan} disabled={scanning}>
                 <RefreshCw size={15} className={scanning ? "animate-spin" : ""} />
                 {scanLabel}
