@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { AppShell } from "@/components/app-shell";
+import { PasswordGate } from "@/components/password-gate";
 
 // Brand fonts: Futura (Md BT Medium) for UI/body, Bronova for display/headings.
 const futura = localFont({
@@ -28,7 +29,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`dark ${futura.variable} ${bronova.variable}`}>
       <body>
-        <AppShell>{children}</AppShell>
+        <PasswordGate>
+          <AppShell>{children}</AppShell>
+        </PasswordGate>
       </body>
     </html>
   );
