@@ -39,7 +39,8 @@ function popupHTML(p: MapPoint): string {
     p.star_rating ? tag(`${p.star_rating}★ ${p.building_class || ""}`.trim(), "#1d4ed8", "#dbeafe") : "",
     p.potential_721_candidate ? tag("721", "#92600a", "#fef3c7") : "",
     p.affordable ? tag("Affordable", "#374151", "#e5e7eb") : "",
-    p.for_sale ? tag("For sale", "#1d4ed8", "#dbeafe") : ""
+    p.for_sale ? tag("For sale", "#1d4ed8", "#dbeafe") : "",
+    p.dscr && p.dscr < 1 ? tag(`DSCR ${p.dscr.toFixed(2)}`, "#b42318", "#fee4e2") : ""
   ].join("");
   return `<div style="font-family:inherit;min-width:212px;color:#111827;">
     <div style="font-weight:700;color:#111827;font-size:14px;">${p.name}</div>
@@ -98,13 +99,19 @@ export function MapPage() {
           source: "sites",
           paint: {
             "circle-radius": ["interpolate", ["linear"], ["get", "call_score"], 40, 4, 70, 7, 92, 12],
+            // DSCR below 1.0 is debt distress -> red. Otherwise color by recommendation.
             "circle-color": [
-              "match",
-              ["get", "recommendation"],
-              "Call Owner", "#3fb950",
-              "Monitor", "#e8c15a",
-              "Ignore", "#6e7681",
-              "#6e7681"
+              "case",
+              ["all", [">", ["get", "dscr"], 0], ["<", ["get", "dscr"], 1]],
+              "#f04438",
+              [
+                "match",
+                ["get", "recommendation"],
+                "Call Owner", "#3fb950",
+                "Monitor", "#e8c15a",
+                "Ignore", "#6e7681",
+                "#6e7681"
+              ]
             ],
             "circle-stroke-width": ["case", ["get", "for_sale"], 2.5, 0.6],
             "circle-stroke-color": ["case", ["get", "for_sale"], "#58a6ff", "#0b0b0b"],
@@ -159,7 +166,7 @@ export function MapPage() {
 
   return (
     <div>
-      <PageHeading eyebrow="Map" title="Site Map">
+      <PageHeading eyebrow="Map" title="Market Map">
         <div className="flex items-center gap-3">
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
@@ -187,6 +194,7 @@ export function MapPage() {
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted">
+        <Legend color="#f04438" label="DSCR < 1.0 (distress)" />
         <Legend color="#3fb950" label="Call Owner" />
         <Legend color="#e8c15a" label="Monitor" />
         <Legend color="#6e7681" label="Ignore" />

@@ -14,7 +14,11 @@ from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy.orm import Session
 
-from backend.app.services.ranking import get_ranked_properties, get_today_call_list
+from backend.app.services.ranking import (
+    get_debt_opportunities,
+    get_ranked_properties,
+    get_today_call_list,
+)
 
 # InTrust brand palette (from brand guidelines).
 BRAND_BLUE = colors.HexColor("#12648a")  # PMS 7706
@@ -165,6 +169,76 @@ def build_today_call_list_pdf(db: Session) -> bytes:
     story.extend(_call_list_table("Top 10 Owners", call_list["top_10_owners"], owner_rows=True))
     story.extend(_call_list_table("Top New Opportunities", call_list["top_new_opportunities"], owner_rows=False))
     story.extend(_call_list_table("Top 25 Owners", call_list["top_25_owners"], owner_rows=True))
+    doc.build(story)
+    return buffer.getvalue()
+
+
+_CELL_RED = ParagraphStyle("cellred", fontName="Helvetica-Bold", fontSize=7, leading=8.5, textColor=colors.HexColor("#c0392b"))
+
+
+def _money(value: float) -> str:
+    if not value:
+        return "-"
+    return f"${value / 1_000_000:.1f}M" if value >= 1_000_000 else f"${value:,.0f}"
+
+
+def _pdf_header(title: str, subtitle: str) -> list[Any]:
+    title_style = ParagraphStyle("title", fontName="Helvetica-Bold", fontSize=20, leading=24, textColor=BRAND_BLUE, spaceAfter=2)
+    sub_style = ParagraphStyle("sub", fontName="Helvetica", fontSize=9, leading=12, textColor=BRAND_GREY)
+    story: list[Any] = []
+    if _LOGO_PATH.exists():
+        width, height = ImageReader(str(_LOGO_PATH)).getSize()
+        logo = Image(str(_LOGO_PATH), width=150, height=150 * height / width)
+        logo.hAlign = "LEFT"
+        story.extend([logo, Spacer(1, 6)])
+    story.extend([Paragraph(title, title_style), Paragraph(subtitle, sub_style), Spacer(1, 10)])
+    return story
+
+
+def build_maturing_debt_pdf(db: Session) -> bytes:
+    rows = get_debt_opportunities(db, data_scope="live", limit=50)
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=landscape(letter), rightMargin=24, leftMargin=24, topMargin=24, bottomMargin=24,
+        title="InTrust Maturing Debt",
+    )
+    story = _pdf_header(
+        "Maturing Debt - Refinance Opportunities",
+        "Owners facing a loan maturity or thin coverage. Ranked by debt pressure. DSCR below 1.20x in red.",
+    )
+    headers = ["Property", "Owner", "Phone", "Units", "Maturity", "Rate", "DSCR", "Loan", "Lender", "Why Now"]
+    data = [[_p(h, _HEAD) for h in headers]]
+    for row in rows:
+        dscr = row.get("dscr") or 0
+        dscr_cell = _p(f"{dscr:.2f}" if dscr else "-", _CELL_RED if dscr and dscr < 1.2 else _CELL)
+        data.append(
+            [
+                _p(row.get("name", "")),
+                _p(row.get("owner_name", "")),
+                _p(row.get("owner_phone") or "-"),
+                _p(row.get("units", "")),
+                _p(row.get("loan_maturity_year") or "-"),
+                _p(f"{row['interest_rate']:.2f}%" if row.get("interest_rate") else "-"),
+                dscr_cell,
+                _p(_money(row.get("loan_amount", 0))),
+                _p(row.get("lender") or "-"),
+                _p(row.get("why_now", "")),
+            ]
+        )
+    table = Table(data, repeatRows=1, colWidths=[90, 82, 62, 28, 42, 34, 34, 48, 86, 232])
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), BRAND_BLUE),
+                ("GRID", (0, 0), (-1, -1), 0.4, BRAND_GREY),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [BRAND_ROW, colors.white]),
+            ]
+        )
+    )
+    story.append(table)
     doc.build(story)
     return buffer.getvalue()
 

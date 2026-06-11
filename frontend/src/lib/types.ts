@@ -156,6 +156,9 @@ export type MapPoint = {
   recommendation: string;
   rent_gap: number;
   hold_period: number;
+  dscr?: number;
+  loan_maturity_year?: number;
+  lender?: string;
   potential_721_candidate: boolean;
 };
 

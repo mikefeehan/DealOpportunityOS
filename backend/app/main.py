@@ -13,7 +13,11 @@ from sqlalchemy.orm import Session, joinedload
 from backend.app.database import Base, engine, ensure_runtime_columns, get_db
 from backend.app.models import Pipeline, Property
 from backend.app.services.ai_insights import generate_ai_call_prep
-from backend.app.services.exports import build_opportunities_csv, build_today_call_list_pdf
+from backend.app.services.exports import (
+    build_maturing_debt_pdf,
+    build_opportunities_csv,
+    build_today_call_list_pdf,
+)
 from backend.app.services.enrichment import enrich_emails
 from backend.app.services.geocoding import geocode_missing
 from backend.app.services.importer import import_universe
@@ -287,6 +291,16 @@ def export_today_call_list_pdf(db: Session = Depends(get_db)) -> Response:
         content=pdf_payload,
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=intrust_tucson_today_call_list.pdf"},
+    )
+
+
+@app.get("/api/export/maturing-debt.pdf")
+def export_maturing_debt_pdf(db: Session = Depends(get_db)) -> Response:
+    pdf_payload = build_maturing_debt_pdf(db)
+    return Response(
+        content=pdf_payload,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=intrust_maturing_debt.pdf"},
     )
 
 

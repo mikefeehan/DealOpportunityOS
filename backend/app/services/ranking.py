@@ -416,6 +416,9 @@ def get_map_points(db: Session, data_scope: str | None = None, market: str | Non
                 "recommendation": score.recommendation if score else "Monitor",
                 "rent_gap": score.rent_gap if score else 0,
                 "hold_period": score.hold_period if score else 0,
+                "dscr": estimate_dscr(prop),
+                "loan_maturity_year": prop.loan_maturity_year,
+                "lender": prop.lender,
                 "potential_721_candidate": score.potential_721_candidate if score else False,
             }
         )

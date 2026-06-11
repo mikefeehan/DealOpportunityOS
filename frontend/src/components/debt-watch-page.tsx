@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpDown, Building2, Flame } from "lucide-react";
+import { ArrowUpDown, Building2, FileText, Flame } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { getDebtWatch } from "@/lib/api";
+import { exportUrl, getDebtWatch } from "@/lib/api";
 import type { PropertyOpportunity } from "@/lib/types";
 import { formatMoney, formatNumber, ownerHref } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeading } from "@/components/page-heading";
 import { ScorePill } from "@/components/score-pill";
@@ -92,9 +93,17 @@ export function DebtWatchPage() {
   return (
     <div>
       <PageHeading eyebrow="Maturing Debt" title="Expiring Debt — Refi Pain">
-        <div className="flex items-center gap-2 text-sm text-muted">
-          <Flame size={16} className="text-red" />
-          Ranked by debt pressure
+        <div className="flex items-center gap-3">
+          <span className="hidden items-center gap-2 text-sm text-muted sm:flex">
+            <Flame size={16} className="text-red" />
+            Ranked by debt pressure
+          </span>
+          <Button asChild variant="secondary">
+            <a href={exportUrl("/api/export/maturing-debt.pdf")}>
+              <FileText size={15} />
+              Debt PDF
+            </a>
+          </Button>
         </div>
       </PageHeading>
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, Download, FileText, Flame, ListChecks, MapPin, PhoneCall, Radar, RefreshCw, UploadCloud, Users } from "lucide-react";
+import { BarChart3, Download, FileText, Flame, LayoutGrid, ListChecks, MapPin, PhoneCall, Radar, RefreshCw, TrendingUp, UploadCloud, Users } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 import { scanTucson, exportUrl, getMarkets, getSelectedMarket, getSummary, setSelectedMarket } from "@/lib/api";
 import type { MarketOption } from "@/lib/types";
@@ -13,9 +13,11 @@ const nav = [
   { href: "/", label: "Top Owners", icon: PhoneCall },
   { href: "/command-center", label: "Command Center", icon: BarChart3 },
   { href: "/opportunities", label: "Opportunity Finder", icon: Radar },
+  { href: "/deals", label: "Deal Finder", icon: LayoutGrid },
+  { href: "/rent-gap", label: "Rent-Gap Candidates", icon: TrendingUp },
   { href: "/debt", label: "Maturing Debt", icon: Flame },
   { href: "/owners", label: "Owner Intelligence", icon: Users },
-  { href: "/map", label: "Site Map", icon: MapPin },
+  { href: "/map", label: "Market Map", icon: MapPin },
   { href: "/pipeline", label: "Pipeline", icon: ListChecks },
   { href: "/review", label: "Import & Review", icon: UploadCloud }
 ];
