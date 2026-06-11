@@ -9,6 +9,7 @@ import { formatMoney, formatNumber } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DemoBadge } from "@/components/demo-badge";
 import { PageHeading } from "@/components/page-heading";
 import { RecommendationBadge } from "@/components/recommendation-badge";
 import { ScorePill } from "@/components/score-pill";
@@ -41,11 +42,21 @@ export function OwnerDetailPage({ ownerName }: { ownerName: string }) {
   return (
     <div>
       <PageHeading eyebrow="Owner Intelligence" title={owner.owner}>
-        <Button onClick={onPrep}>
-          <Brain size={15} />
-          Generate AI Call Prep
-        </Button>
+        <div className="flex items-center gap-2">
+          <DemoBadge dataStatus={owner.data_status} />
+          <Button onClick={onPrep}>
+            <Brain size={15} />
+            Generate AI Call Prep
+          </Button>
+        </div>
       </PageHeading>
+
+      {owner.data_status === "seeded_fallback" && (
+        <div className="mb-4 rounded-md border border-red/35 bg-red/10 px-3 py-2 text-sm text-red">
+          This is seeded demo data — not a verified real owner. Do not contact. Import and confirm a real
+          record on the Import &amp; Review page to replace it.
+        </div>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-[0.75fr_1.25fr]">
         <Card>

@@ -6,6 +6,7 @@ import { getPipeline, updatePipeline } from "@/lib/api";
 import type { PipelinePayload, PropertyOpportunity } from "@/lib/types";
 import { ownerHref } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DemoBadge } from "@/components/demo-badge";
 import { Select } from "@/components/ui/select";
 import { PageHeading } from "@/components/page-heading";
 import { RecommendationBadge } from "@/components/recommendation-badge";
@@ -57,6 +58,7 @@ export function PipelinePage() {
                       <ScorePill value={property.call_score} className="min-w-14 text-xs" />
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
+                      <DemoBadge dataStatus={property.data_status} />
                       <RecommendationBadge value={property.recommendation} />
                     </div>
                     <p className="mt-3 text-xs text-muted">{property.why_now}</p>

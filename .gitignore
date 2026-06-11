@@ -8,8 +8,10 @@ node_modules/
 .next/
 out/
 dist/
+*.tsbuildinfo
 .env
 .env.local
 *.log
 .playwright-mcp/
 opportunityos-home.png
+.claude/

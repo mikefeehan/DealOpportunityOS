@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { Brain, Building2, ExternalLink, PhoneCall } from "lucide-react";
+import { Brain, Building2, ExternalLink, PhoneCall, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
-import { generateCallPrep, getTodayCallList } from "@/lib/api";
+import { generateCallPrep, getSummary, getTodayCallList } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import type { CallPrep, OwnerProfile, TodayCallList } from "@/lib/types";
 import { formatMoney, formatNumber, ownerHref } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DemoBadge } from "@/components/demo-badge";
 import { PageHeading } from "@/components/page-heading";
 import { RecommendationBadge } from "@/components/recommendation-badge";
 import { ScorePill } from "@/components/score-pill";
@@ -71,6 +73,7 @@ function OwnerRow({
           <ExternalLink size={13} className="text-muted group-hover:text-amber" />
         </Link>
         <div className="mt-1 flex flex-wrap gap-2">
+          <DemoBadge dataStatus={owner.data_status} />
           <Badge tone={owner.owner_state === "CA" || owner.owner_state === "NV" ? "cyan" : "default"}>
             {owner.owner_state || "Owner State Unknown"}
           </Badge>
@@ -96,14 +99,30 @@ function OwnerRow({
   );
 }
 
+type Scope = "verified" | "all";
+
 export function TopOwnersPage() {
   const [data, setData] = useState<TodayCallList | null>(null);
   const [activePrep, setActivePrep] = useState<CallPrep | null>(null);
   const [prepOwner, setPrepOwner] = useState("");
+  const [scope, setScope] = useState<Scope | null>(null);
+  const [verifiedCount, setVerifiedCount] = useState(0);
+
+  // Decide the initial scope from provenance: default to verified-live once any
+  // verified records exist, otherwise show everything (demo fallback) so the
+  // dashboard is never empty.
+  useEffect(() => {
+    getSummary().then((summary) => {
+      const verified = summary.data_provenance.verified_live_records ?? 0;
+      setVerifiedCount(verified);
+      setScope(verified > 0 ? "verified" : "all");
+    });
+  }, []);
 
   useEffect(() => {
-    getTodayCallList().then(setData);
-  }, []);
+    if (!scope) return;
+    getTodayCallList(scope).then(setData);
+  }, [scope]);
 
   async function prep(owner: OwnerProfile) {
     setPrepOwner(owner.owner);
@@ -126,9 +145,36 @@ export function TopOwnersPage() {
   return (
     <div>
       <PageHeading eyebrow="Today's Call List" title="Top Owners To Call">
-        <div className="flex items-center gap-2 text-sm text-muted">
-          <PhoneCall size={16} className="text-amber" />
-          Sorted by Call Score
+        <div className="flex flex-col items-end gap-2">
+          <div className="inline-flex overflow-hidden rounded-md border border-border">
+            <button
+              type="button"
+              onClick={() => setScope("verified")}
+              disabled={verifiedCount === 0}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                scope === "verified" ? "bg-green/15 text-green" : "bg-panel2 text-muted hover:text-ink"
+              )}
+              title={verifiedCount === 0 ? "No verified live records yet — import and confirm in Import & Review" : undefined}
+            >
+              <ShieldCheck size={13} />
+              Verified Live Only{verifiedCount > 0 ? ` (${verifiedCount})` : ""}
+            </button>
+            <button
+              type="button"
+              onClick={() => setScope("all")}
+              className={cn(
+                "inline-flex items-center gap-1.5 border-l border-border px-3 py-1.5 text-xs font-medium transition-colors",
+                scope === "all" ? "bg-amber/15 text-amber" : "bg-panel2 text-muted hover:text-ink"
+              )}
+            >
+              Include Demo Fallback
+            </button>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted">
+            <PhoneCall size={16} className="text-amber" />
+            Sorted by Call Score
+          </div>
         </div>
       </PageHeading>
 
@@ -150,6 +196,7 @@ export function TopOwnersPage() {
                     <span className="text-sm font-semibold text-ink">
                       #{owner.rank} {owner.owner}
                     </span>
+                    <DemoBadge dataStatus={owner.data_status} />
                     <RecommendationBadge value={owner.recommendation} />
                     {owner.potential_721_candidate && <Badge tone="amber">721</Badge>}
                   </div>
@@ -181,9 +228,10 @@ export function TopOwnersPage() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="flex items-center gap-2 text-sm font-semibold text-ink">
+                      <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
                         <Building2 size={15} className="text-amber" />
                         {property.name}
+                        <DemoBadge dataStatus={property.data_status} />
                       </div>
                       <div className="mt-1 text-xs text-muted">{property.owner_name}</div>
                     </div>

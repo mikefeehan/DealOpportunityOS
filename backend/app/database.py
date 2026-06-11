@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
@@ -26,4 +26,34 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+# Columns added after the initial schema. Because this app uses create_all (no
+# Alembic), existing local SQLite databases won't pick up new columns. This
+# lightweight check adds any missing columns in-place so the dashboard always
+# loads without forcing the user to delete opportunityos.db.
+_ADDED_PROPERTY_COLUMNS = {
+    "data_status": "VARCHAR(40) DEFAULT 'seeded_fallback'",
+    "match_status": "VARCHAR(40) DEFAULT 'no_match'",
+    "source_url": "VARCHAR(400) DEFAULT ''",
+    "source_name": "VARCHAR(160) DEFAULT ''",
+    "match_confidence": "FLOAT DEFAULT 0",
+    "matched_address": "VARCHAR(255) DEFAULT ''",
+    "last_verified_at": "DATETIME",
+}
+
+
+def ensure_runtime_columns() -> None:
+    if not DATABASE_URL.startswith("sqlite"):
+        return
+    inspector = inspect(engine)
+    if "properties" not in inspector.get_table_names():
+        return
+    existing = {col["name"] for col in inspector.get_columns("properties")}
+    missing = {name: ddl for name, ddl in _ADDED_PROPERTY_COLUMNS.items() if name not in existing}
+    if not missing:
+        return
+    with engine.begin() as conn:
+        for name, ddl in missing.items():
+            conn.execute(text(f"ALTER TABLE properties ADD COLUMN {name} {ddl}"))
 

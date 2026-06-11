@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, Building2, Download, FileText, ListChecks, PhoneCall, Radar, RefreshCw, Users } from "lucide-react";
+import { BarChart3, Building2, Download, FileText, ListChecks, PhoneCall, Radar, RefreshCw, UploadCloud, Users } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 import { scanTucson, exportUrl, getSummary } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,8 @@ const nav = [
   { href: "/command-center", label: "Command Center", icon: BarChart3 },
   { href: "/opportunities", label: "Opportunity Finder", icon: Radar },
   { href: "/owners", label: "Owner Intelligence", icon: Users },
-  { href: "/pipeline", label: "Pipeline", icon: ListChecks }
+  { href: "/pipeline", label: "Pipeline", icon: ListChecks },
+  { href: "/review", label: "Import & Review", icon: UploadCloud }
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

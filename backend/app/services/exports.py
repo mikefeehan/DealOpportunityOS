@@ -19,6 +19,9 @@ def build_opportunities_csv(db: Session) -> str:
     writer = csv.DictWriter(
         output,
         fieldnames=[
+            "data_status",
+            "is_demo",
+            "match_status",
             "call_score",
             "fit_score",
             "motivation_score",
@@ -41,6 +44,9 @@ def build_opportunities_csv(db: Session) -> str:
     for row in rows:
         writer.writerow(
             {
+                "data_status": row.get("data_status", ""),
+                "is_demo": "DEMO" if row.get("data_status") == "seeded_fallback" else "",
+                "match_status": row.get("match_status", ""),
                 "call_score": row["call_score"],
                 "fit_score": row["fit_score"],
                 "motivation_score": row["motivation_score"],

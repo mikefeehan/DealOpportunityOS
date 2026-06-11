@@ -338,9 +338,14 @@ def _attempt_inventory_url(url: str, db: Session) -> dict[str, Any]:
         "owner_city": pima.get("owner_city") or "",
         "owner_state": pima.get("owner_state") or "",
         "source": f"Configured authorized source: {domain}",
+        "source_name": f"Authorized source: {domain}",
+        "source_url": url,
         "last_sale_year": 2011,
         "average_rent": record["average_rent"],
         "market_rent": record["market_rent"],
+        "data_status": "live_authorized",
+        "match_status": "needs_review" if pima.get("parcel_id") else "no_match",
+        "match_confidence": 0.6 if pima.get("parcel_id") else 0.0,
     }
     upsert_property(db, payload)
     db.commit()
@@ -412,9 +417,13 @@ def _attempt_arcgis_source(source: dict[str, str], db: Session) -> dict[str, Any
             "owner_city": "",
             "owner_state": owner_state,
             "source": source["name"],
+            "source_name": source["name"],
             "last_sale_year": 2011,
             "average_rent": 950,
             "market_rent": 1250,
+            "data_status": "live_public",
+            "match_status": "needs_review",
+            "match_confidence": 0.5,
         }
         upsert_property(db, prop)
         imported += 1

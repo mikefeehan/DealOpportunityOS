@@ -583,7 +583,17 @@ def upsert_property(db: Session, payload: dict) -> Property:
 def ensure_seed_data(db: Session) -> int:
     inserted_or_updated = 0
     for payload in SEEDED_PROPERTIES:
-        upsert_property(db, {**payload, "property_type": "Apartments", "source": "Seeded Tucson fallback"})
+        upsert_property(
+            db,
+            {
+                **payload,
+                "property_type": "Apartments",
+                "source": "Seeded Tucson fallback",
+                "data_status": "seeded_fallback",
+                "match_status": "no_match",
+                "source_name": "Seeded Tucson fallback",
+            },
+        )
         inserted_or_updated += 1
     db.commit()
     return inserted_or_updated

@@ -8,6 +8,7 @@ import type { PropertyOpportunity } from "@/lib/types";
 import { formatMoney, ownerHref } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { DemoBadge } from "@/components/demo-badge";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { PageHeading } from "@/components/page-heading";
@@ -121,9 +122,12 @@ export function OpportunityFinderPage() {
                   <td className="px-3 py-3 text-sm text-ink">{row.fit_score.toFixed(1)}</td>
                   <td className="px-3 py-3 text-sm text-ink">{row.motivation_score.toFixed(1)}</td>
                   <td className="px-3 py-3">
-                    <Link href={`/properties/${row.id}`} className="font-medium text-ink hover:text-amber">
-                      {row.name}
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link href={`/properties/${row.id}`} className="font-medium text-ink hover:text-amber">
+                        {row.name}
+                      </Link>
+                      <DemoBadge dataStatus={row.data_status} />
+                    </div>
                     <div className="mt-1 text-xs text-muted">{row.parcel_id}</div>
                   </td>
                   <td className="px-3 py-3 text-sm text-ink">{row.units}</td>

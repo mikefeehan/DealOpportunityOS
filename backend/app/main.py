@@ -2,17 +2,18 @@ from __future__ import annotations
 
 from urllib.parse import unquote
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
-from backend.app.database import Base, engine, get_db
+from backend.app.database import Base, engine, ensure_runtime_columns, get_db
 from backend.app.models import Pipeline, Property
 from backend.app.services.ai_insights import generate_ai_call_prep
 from backend.app.services.exports import build_opportunities_csv, build_today_call_list_pdf
+from backend.app.services.importer import import_universe
 from backend.app.services.ranking import (
     get_market_summary,
     get_owner_profile,
@@ -21,6 +22,7 @@ from backend.app.services.ranking import (
     get_today_call_list,
     property_to_dict,
 )
+from backend.app.services.review import confirm_match, get_review_queue, reject_record
 from backend.app.services.scanner import run_tucson_scan
 from backend.app.services.scoring import PIPELINE_STAGES
 from backend.app.services.seed_data import ensure_seed_data
@@ -54,6 +56,7 @@ class CallPrepRequest(BaseModel):
 @app.on_event("startup")
 def startup() -> None:
     Base.metadata.create_all(bind=engine)
+    ensure_runtime_columns()
     with Session(engine) as db:
         ensure_seed_data(db)
 
@@ -74,8 +77,8 @@ def market_summary(db: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/api/today-call-list")
-def today_call_list(db: Session = Depends(get_db)) -> dict:
-    return get_today_call_list(db)
+def today_call_list(data_scope: str | None = Query(None), db: Session = Depends(get_db)) -> dict:
+    return get_today_call_list(db, data_scope=data_scope)
 
 
 @app.get("/api/opportunities")
@@ -85,6 +88,7 @@ def opportunities(
     recommendation: str | None = None,
     min_score: float | None = None,
     intrust_mode: bool = Query(False),
+    data_scope: str | None = Query(None),
     limit: int | None = Query(None, ge=1, le=500),
     db: Session = Depends(get_db),
 ) -> list[dict]:
@@ -96,16 +100,60 @@ def opportunities(
         intrust_mode=intrust_mode,
         recommendation=recommendation,
         limit=limit,
+        data_scope=data_scope,
     )
 
 
 @app.get("/api/owners")
 def owners(
     intrust_mode: bool = Query(False),
+    data_scope: str | None = Query(None),
     limit: int | None = Query(None, ge=1, le=500),
     db: Session = Depends(get_db),
 ) -> list[dict]:
-    return get_owner_profiles(db, intrust_mode=intrust_mode, limit=limit)
+    return get_owner_profiles(db, intrust_mode=intrust_mode, limit=limit, data_scope=data_scope)
+
+
+@app.post("/api/import/universe")
+async def import_real_universe(
+    file: UploadFile = File(...),
+    source_name: str = Form(""),
+    db: Session = Depends(get_db),
+) -> dict:
+    filename = file.filename or "upload.csv"
+    if not filename.lower().endswith((".csv", ".xlsx", ".xlsm", ".xls")):
+        raise HTTPException(status_code=400, detail="Upload a .csv or .xlsx file.")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="The uploaded file is empty.")
+    try:
+        result = import_universe(db, filename, content, source_name=source_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    # status == "error" (e.g. missing required column) is returned as a 200 with a
+    # structured payload so the UI can show detected columns and guidance.
+    return result
+
+
+@app.get("/api/review-queue")
+def review_queue(include_verified: bool = Query(False), db: Session = Depends(get_db)) -> dict:
+    return get_review_queue(db, include_verified=include_verified)
+
+
+@app.post("/api/review/{property_id}/confirm")
+def review_confirm(property_id: int, db: Session = Depends(get_db)) -> dict:
+    result = confirm_match(db, property_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Property not found")
+    return result
+
+
+@app.post("/api/review/{property_id}/reject")
+def review_reject(property_id: int, db: Session = Depends(get_db)) -> dict:
+    result = reject_record(db, property_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Property not found")
+    return result
 
 
 @app.get("/api/owners/{owner_name:path}")

@@ -6,14 +6,20 @@ import {
 } from "./fallback";
 import type {
   CallPrep,
+  ImportSummary,
   MarketSummary,
   OwnerProfile,
   PipelinePayload,
   PropertyOpportunity,
+  ReviewQueue,
   TodayCallList
 } from "./types";
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+// Default to IPv4 explicitly. On Windows, "localhost" often resolves to IPv6
+// (::1) first, but the backend binds to IPv4 (127.0.0.1) — so a "localhost"
+// base makes every request fail (GETs silently fall back, uploads surface
+// "Failed to fetch"). Override with NEXT_PUBLIC_API_BASE when needed.
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://127.0.0.1:8000";
 
 export function exportUrl(path: string) {
   return `${API_BASE}${path}`;
@@ -38,8 +44,11 @@ async function fetchJson<T>(path: string, fallback: T, init?: RequestInit): Prom
   }
 }
 
-export function getTodayCallList() {
-  return fetchJson<TodayCallList>("/api/today-call-list", fallbackToday);
+export function getTodayCallList(dataScope?: string) {
+  const params = new URLSearchParams();
+  if (dataScope) params.set("data_scope", dataScope);
+  const query = params.toString();
+  return fetchJson<TodayCallList>(`/api/today-call-list${query ? `?${query}` : ""}`, fallbackToday);
 }
 
 export function getSummary() {
@@ -86,6 +95,41 @@ export function updatePipeline(propertyId: number, payload: { stage?: string; no
     method: "PATCH",
     body: JSON.stringify(payload)
   });
+}
+
+export function getReviewQueue(includeVerified = false) {
+  const params = new URLSearchParams();
+  if (includeVerified) params.set("include_verified", "true");
+  const query = params.toString();
+  return fetchJson<ReviewQueue>(
+    `/api/review-queue${query ? `?${query}` : ""}`,
+    { total: 0, needs_review: 0, no_match: 0, verified: 0, records: [] }
+  );
+}
+
+export async function importUniverse(file: File, sourceName: string): Promise<ImportSummary> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("source_name", sourceName);
+  try {
+    const response = await fetch(`${API_BASE}/api/import/universe`, { method: "POST", body: form });
+    const body = (await response.json().catch(() => null)) as ImportSummary | { detail?: string } | null;
+    if (!response.ok) {
+      const detail = (body && "detail" in body && body.detail) || `${response.status} ${response.statusText}`;
+      return { status: "error", error: String(detail), rows_seen: 0, imported: 0 };
+    }
+    return (body as ImportSummary) ?? { status: "error", error: "Empty response", rows_seen: 0, imported: 0 };
+  } catch (err) {
+    return { status: "error", error: String(err), rows_seen: 0, imported: 0 };
+  }
+}
+
+export function confirmMatch(propertyId: number) {
+  return fetchJson(`/api/review/${propertyId}/confirm`, { id: propertyId }, { method: "POST" });
+}
+
+export function rejectRecord(propertyId: number) {
+  return fetchJson(`/api/review/${propertyId}/reject`, { id: propertyId }, { method: "POST" });
 }
 
 export function generateCallPrep(ownerName: string) {

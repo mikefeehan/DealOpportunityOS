@@ -30,6 +30,18 @@ class Property(Base):
     last_sale_year: Mapped[int] = mapped_column(Integer, default=2000)
     average_rent: Mapped[float] = mapped_column(Float, default=0)
     market_rent: Mapped[float] = mapped_column(Float, default=0)
+
+    # Provenance and parcel-match confidence (set by importer / scanner).
+    # data_status: seeded_fallback | live_authorized | live_public
+    data_status: Mapped[str] = mapped_column(String(40), default="seeded_fallback", index=True)
+    # match_status: verified | needs_review | no_match
+    match_status: Mapped[str] = mapped_column(String(40), default="no_match", index=True)
+    source_url: Mapped[str] = mapped_column(String(400), default="")
+    source_name: Mapped[str] = mapped_column(String(160), default="")
+    match_confidence: Mapped[float] = mapped_column(Float, default=0)
+    matched_address: Mapped[str] = mapped_column(String(255), default="")
+    last_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

@@ -9,6 +9,7 @@ import { formatMoney, formatNumber, ownerHref } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DemoBadge } from "@/components/demo-badge";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeading } from "@/components/page-heading";
@@ -45,8 +46,18 @@ export function PropertyDetailPage({ id }: { id: string }) {
   return (
     <div>
       <PageHeading eyebrow="Property Detail" title={property.name}>
-        <RecommendationBadge value={property.recommendation} />
+        <div className="flex items-center gap-2">
+          <DemoBadge dataStatus={property.data_status} />
+          <RecommendationBadge value={property.recommendation} />
+        </div>
       </PageHeading>
+
+      {property.data_status === "seeded_fallback" && (
+        <div className="mb-4 rounded-md border border-red/35 bg-red/10 px-3 py-2 text-sm text-red">
+          This is seeded demo data — not a verified real property. The owner, units, value, and rents are
+          fabricated to exercise scoring. Do not contact.
+        </div>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
         <Card>

@@ -210,6 +210,15 @@ Services:
   - CSV export
   - Today's Call List PDF
 
+- `backend/app/services/importer.py` (added)
+  - Real Universe importer: parse CSV/XLSX, flexible column mapping
+  - Pima parcel match attempt, parcel-match confidence
+  - upsert as `live_authorized` with `match_status` of `needs_review` / `no_match`
+
+- `backend/app/services/review.py` (added)
+  - parcel-match review queue
+  - confirm (-> `verified`) / reject (delete) actions
+
 ## API Endpoints
 
 Health:
@@ -252,6 +261,19 @@ AI:
 
 - `POST /api/ai/call-prep`
 
+Real Universe import + parcel-match review (added):
+
+- `POST /api/import/universe` (multipart: `file` = .csv/.xlsx, `source_name` = label)
+- `GET /api/review-queue?include_verified=false`
+- `POST /api/review/{property_id}/confirm` (promote to `verified`)
+- `POST /api/review/{property_id}/reject` (delete imported record)
+
+Data scope (added to opportunities / owners / today-call-list):
+
+- `data_scope=verified` = verified live records only
+- `data_scope=all` = everything incl. seeded demo fallback
+- omitted / `auto` = verified live if any exist, else fallback (dashboard never empty)
+
 ## Frontend Structure
 
 Root:
@@ -282,6 +304,9 @@ Pages:
 
 - `frontend/src/app/pipeline/page.tsx`
   - Pipeline board
+
+- `frontend/src/app/review/page.tsx`
+  - Import & Review queue (Real Universe importer + parcel-match confirm/reject)
 
 Shared shell:
 
@@ -469,55 +494,38 @@ Limitations:
 
 ## Suggested Next Implementation Tasks
 
-Task 1: Add Real Universe Importer
+Task 1: Add Real Universe Importer — DONE
 
-- Add backend upload endpoint:
-  - `POST /api/import/universe`
-- Accept `.csv` and `.xlsx`.
-- Use `pandas` or standard CSV plus `openpyxl`.
-- Normalize columns through a mapping layer.
-- Upsert records by normalized address first, then parcel ID after match.
+- `POST /api/import/universe` accepts `.csv` / `.xlsx` (`backend/app/services/importer.py`).
+- Standard-lib CSV + `openpyxl` for XLSX (no pandas). `python-multipart` for upload.
+- Flexible header mapping in `COLUMN_ALIASES` (property name / address / units required-ish).
+- Upserts by Pima parcel ID when matched, else a deterministic synthetic `IMP-<hash>` id.
+- Template for the user to fill: `data/universe_import_template.csv`.
+- Note: manual imports without a sale year default `last_sale_year` to `DEFAULT_LAST_SALE_YEAR`
+  (2012) — a neutral placeholder so motivation scoring isn't overstated. Enrich later.
 
-Task 2: Add Parcel Match Confidence
+Task 2: Add Parcel Match Confidence — DONE
 
-Add fields to `properties`:
+- New `properties` columns (in `models.py`): `data_status`, `match_status`, `source_url`,
+  `source_name`, `match_confidence`, `matched_address`, `last_verified_at`.
+- Because there is no Alembic, `database.ensure_runtime_columns()` runs on startup and
+  `ALTER TABLE`s any missing columns into an existing SQLite db (no need to delete the db).
 
-- `data_status`
-  - `seeded_fallback`
-  - `live_authorized`
-  - `live_public`
+Task 3: Add Review Queue Page — DONE
 
-- `match_status`
-  - `verified`
-  - `needs_review`
-  - `no_match`
+- `/review` (`frontend/src/components/review-page.tsx`): upload panel + review table.
+- `GET /api/review-queue`, `POST /api/review/{id}/confirm`, `POST /api/review/{id}/reject`
+  (`backend/app/services/review.py`). Confirm -> `verified`; reject deletes the record.
+- `no_match` rows can still be "Verify anyway" (manual override) so real deals that don't
+  auto-match aren't dead-ended.
 
-- `source_url`
-- `source_name`
-- `last_verified_at`
+Task 4: Hide Fallback From Real Call List — DONE
 
-Task 3: Add Review Queue Page
-
-New page:
-
-- `/review`
-
-Show:
-
-- imported records needing parcel match review
-- candidate parcel matches
-- button to confirm match
-- button to reject match
-
-Task 4: Hide Fallback From Real Call List
-
-Once live records exist:
-
-- Homepage should default to verified live records.
-- Fallback should be available only as demo mode.
-- Add a toggle:
-  - `Verified Live Only`
-  - `Include Demo Fallback`
+- `data_scope` param on opportunities/owners/today-call-list (`verified` / `all` / auto).
+- Homepage toggle "Verified Live Only" vs "Include Demo Fallback"; defaults to verified once
+  any verified live record exists, else falls back so the dashboard is never empty.
+- Provenance banner now counts `verified_live_records` / `needs_review_records` by
+  `data_status` instead of matching the source string.
 
 Task 5: Optional Browser Automation
 
@@ -564,9 +572,11 @@ If the app is not reachable, restart with the commands above.
 
 ## Known Issues / Caveats
 
-1. Current database schema has no migration system.
-   - It uses SQLAlchemy `create_all`.
-   - If changing columns, consider deleting local `opportunityos.db` or adding Alembic.
+1. Current database schema has no full migration system.
+   - It uses SQLAlchemy `create_all` for table creation.
+   - `database.ensure_runtime_columns()` adds known new columns to an existing SQLite db on
+     startup (lightweight `ALTER TABLE`), so the provenance/match columns land without
+     deleting `opportunityos.db`. For larger schema changes, still consider Alembic.
 
 2. Seed data is demo-like.
    - It is designed to exercise scoring and owner grouping.

@@ -1,0 +1,2 @@
+property_name,address,units,year_built,average_rent,market_rent,owner_name,owner_city,owner_state,last_sale_year,source
+Example Apartments,1485 E Fort Lowell Rd Tucson AZ 85719,124,1973,965,1295,Desert Ridge Multifamily LLC,Beverly Hills,CA,1999,HelloData

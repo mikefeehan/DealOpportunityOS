@@ -46,6 +46,13 @@ def property_to_dict(prop: Property) -> dict[str, Any]:
         "property_type": prop.property_type,
         "submarket": prop.submarket,
         "source": prop.source,
+        "source_name": prop.source_name,
+        "source_url": prop.source_url,
+        "data_status": prop.data_status,
+        "match_status": prop.match_status,
+        "match_confidence": prop.match_confidence,
+        "matched_address": prop.matched_address,
+        "last_verified_at": prop.last_verified_at.isoformat() + "Z" if prop.last_verified_at else None,
         "last_sale_year": prop.last_sale_year,
         "average_rent": prop.average_rent,
         "market_rent": prop.market_rent,
@@ -67,7 +74,32 @@ def property_to_dict(prop: Property) -> dict[str, Any]:
     }
 
 
-def query_properties(db: Session) -> list[Property]:
+def has_verified_live(db: Session) -> bool:
+    stmt = (
+        select(Property.id)
+        .where(Property.match_status == "verified", Property.data_status != "seeded_fallback")
+        .limit(1)
+    )
+    return db.scalar(stmt) is not None
+
+
+def resolve_verified_only(db: Session, data_scope: str | None) -> bool:
+    """Translate a requested scope into a verified-only flag.
+
+    - "verified": always verified-live records only.
+    - "all": everything (includes seeded demo fallback).
+    - "auto"/None: verified-live if any exist, otherwise fall back to everything
+      so the dashboard always loads.
+    """
+    scope = (data_scope or "auto").lower()
+    if scope == "verified":
+        return True
+    if scope == "all":
+        return False
+    return has_verified_live(db)
+
+
+def query_properties(db: Session, verified_only: bool = False) -> list[Property]:
     stmt = (
         select(Property)
         .options(joinedload(Property.score), joinedload(Property.pipeline))
@@ -75,6 +107,8 @@ def query_properties(db: Session) -> list[Property]:
         .where(Property.units >= 50)
         .order_by(OpportunityScore.call_score.desc(), OpportunityScore.acquisition_score.desc())
     )
+    if verified_only:
+        stmt = stmt.where(Property.match_status == "verified", Property.data_status != "seeded_fallback")
     return list(db.scalars(stmt).all())
 
 
@@ -133,9 +167,11 @@ def get_ranked_properties(
     intrust_mode: bool = False,
     recommendation: str | None = None,
     limit: int | None = None,
+    data_scope: str | None = None,
 ) -> list[dict[str, Any]]:
+    verified_only = resolve_verified_only(db, data_scope)
     props = filter_properties(
-        query_properties(db),
+        query_properties(db, verified_only=verified_only),
         q=q,
         stage=stage,
         min_score=min_score,
@@ -173,8 +209,14 @@ def owner_angle(owner: dict[str, Any]) -> str:
     return "Open with a low-pressure portfolio review and off-market pricing feedback."
 
 
-def get_owner_profiles(db: Session, intrust_mode: bool = False, limit: int | None = None) -> list[dict[str, Any]]:
-    props = filter_properties(query_properties(db), intrust_mode=intrust_mode)
+def get_owner_profiles(
+    db: Session,
+    intrust_mode: bool = False,
+    limit: int | None = None,
+    data_scope: str | None = None,
+) -> list[dict[str, Any]]:
+    verified_only = resolve_verified_only(db, data_scope)
+    props = filter_properties(query_properties(db, verified_only=verified_only), intrust_mode=intrust_mode)
     grouped: dict[str, list[Property]] = defaultdict(list)
     for prop in props:
         grouped[prop.owner_name].append(prop)
@@ -197,8 +239,14 @@ def get_owner_profiles(db: Session, intrust_mode: bool = False, limit: int | Non
         average_rent_gap = mean(score.rent_gap for score in scores)
         oldest = min(prop.last_sale_year for prop in owned)
         newest = max(prop.last_sale_year for prop in owned)
+        owner_data_status = (
+            "seeded_fallback"
+            if all((prop.data_status or "seeded_fallback") == "seeded_fallback" for prop in owned)
+            else "live"
+        )
         profile = {
             "owner": owner_name,
+            "data_status": owner_data_status,
             "mailing_address": owned[0].mailing_address,
             "owner_city": owned[0].owner_city,
             "owner_state": owner_state,
@@ -238,7 +286,8 @@ def get_owner_profiles(db: Session, intrust_mode: bool = False, limit: int | Non
 
 
 def get_owner_profile(db: Session, owner_name: str) -> dict[str, Any] | None:
-    for owner in get_owner_profiles(db, intrust_mode=False):
+    # Detail/call-prep lookups must resolve any owner, including demo fallback.
+    for owner in get_owner_profiles(db, intrust_mode=False, data_scope="all"):
         if owner["owner"].lower() == owner_name.lower():
             return owner
     return None
@@ -256,8 +305,16 @@ def get_market_summary(db: Session) -> dict[str, Any]:
     source_counts: dict[str, int] = {}
     for prop in props:
         source_counts[prop.source] = source_counts.get(prop.source, 0) + 1
-    fallback_records = sum(count for source, count in source_counts.items() if "Seeded" in source)
-    live_records = len(props) - fallback_records
+
+    all_props = list(db.scalars(select(Property)).all())
+    fallback_records = sum(1 for prop in all_props if prop.data_status == "seeded_fallback")
+    live_records = sum(1 for prop in all_props if prop.data_status != "seeded_fallback")
+    verified_live_records = sum(
+        1 for prop in all_props if prop.match_status == "verified" and prop.data_status != "seeded_fallback"
+    )
+    needs_review_records = sum(
+        1 for prop in all_props if prop.match_status in {"needs_review", "no_match"} and prop.data_status != "seeded_fallback"
+    )
 
     call_owner = [score for score in scores if score.recommendation == "Call Owner"]
     long_hold_owner_names = {
@@ -276,14 +333,26 @@ def get_market_summary(db: Session) -> dict[str, Any]:
         "average_call_score": round(mean(score.call_score for score in scores), 1) if scores else 0,
         "potential_721_candidates": sum(1 for score in scores if score.potential_721_candidate),
         "data_provenance": {
-            "mode": "Seeded fallback" if live_records == 0 else "Live public data + fallback",
+            "mode": (
+                "Verified live"
+                if verified_live_records > 0 and fallback_records == 0
+                else "Verified live + fallback"
+                if verified_live_records > 0
+                else "Seeded fallback"
+                if live_records == 0
+                else "Imported, pending review"
+            ),
             "live_records": live_records,
+            "verified_live_records": verified_live_records,
+            "needs_review_records": needs_review_records,
             "fallback_records": fallback_records,
             "source_counts": source_counts,
             "disclaimer": (
                 "Seeded fallback records are pilot/demo intelligence and are not verified real acquisition opportunities."
-                if fallback_records
-                else "Records are sourced from public data attempts and still require analyst verification before outreach."
+                if fallback_records and verified_live_records == 0
+                else "Imported records require analyst parcel-match confirmation before entering the real call list."
+                if needs_review_records and verified_live_records == 0
+                else "Records are analyst-verified against Pima County parcel data."
             ),
         },
         "reporting": {
@@ -305,16 +374,16 @@ def get_market_summary(db: Session) -> dict[str, Any]:
     }
 
 
-def get_today_call_list(db: Session) -> dict[str, Any]:
-    top_owners = get_owner_profiles(db, intrust_mode=True, limit=25)
+def get_today_call_list(db: Session, data_scope: str | None = None) -> dict[str, Any]:
+    top_owners = get_owner_profiles(db, intrust_mode=True, limit=25, data_scope=data_scope)
     if len(top_owners) < 10:
-        top_owners = get_owner_profiles(db, intrust_mode=False, limit=25)
-    top_properties = get_ranked_properties(db, intrust_mode=True, limit=25)
+        top_owners = get_owner_profiles(db, intrust_mode=False, limit=25, data_scope=data_scope)
+    top_properties = get_ranked_properties(db, intrust_mode=True, limit=25, data_scope=data_scope)
     if len(top_properties) < 10:
-        top_properties = get_ranked_properties(db, intrust_mode=False, limit=25)
+        top_properties = get_ranked_properties(db, intrust_mode=False, limit=25, data_scope=data_scope)
     new_opportunities = [
         prop
-        for prop in get_ranked_properties(db, recommendation="Call Owner", limit=25)
+        for prop in get_ranked_properties(db, recommendation="Call Owner", limit=25, data_scope=data_scope)
         if prop["stage"] in {"Identified", "Research"}
     ][:10]
     return {

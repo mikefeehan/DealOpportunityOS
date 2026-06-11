@@ -9,6 +9,7 @@ import { formatMoney, formatNumber, ownerHref } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { DemoBadge } from "@/components/demo-badge";
 import { Input } from "@/components/ui/input";
 import { PageHeading } from "@/components/page-heading";
 import { RecommendationBadge } from "@/components/recommendation-badge";
@@ -75,6 +76,7 @@ export function OwnerIntelligencePage() {
                       {owner.owner}
                     </Link>
                     <div className="mt-1 flex flex-wrap gap-2">
+                      <DemoBadge dataStatus={owner.data_status} />
                       <Badge>{owner.owner_state}</Badge>
                       <RecommendationBadge value={owner.recommendation} />
                     </div>

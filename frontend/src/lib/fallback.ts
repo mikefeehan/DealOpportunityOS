@@ -18,6 +18,13 @@ export const fallbackProperty: PropertyOpportunity = {
   property_type: "Apartments",
   submarket: "Central Tucson",
   source: "Frontend fallback preview",
+  source_name: "Frontend fallback preview",
+  source_url: "",
+  data_status: "seeded_fallback",
+  match_status: "no_match",
+  match_confidence: 0,
+  matched_address: "",
+  last_verified_at: null,
   last_sale_year: 1999,
   average_rent: 965,
   market_rent: 1295,
@@ -41,6 +48,7 @@ export const fallbackProperty: PropertyOpportunity = {
 export const fallbackOwner: OwnerProfile = {
   rank: 1,
   owner: "Desert Ridge Multifamily LLC",
+  data_status: "seeded_fallback",
   mailing_address: fallbackProperty.mailing_address,
   owner_city: "Beverly Hills",
   owner_state: "CA",
@@ -78,6 +86,8 @@ export const fallbackSummary: MarketSummary = {
   data_provenance: {
     mode: "Frontend fallback preview",
     live_records: 0,
+    verified_live_records: 0,
+    needs_review_records: 0,
     fallback_records: 1,
     source_counts: { "Frontend fallback preview": 1 },
     disclaimer: "Fallback preview records are not verified real acquisition opportunities."
