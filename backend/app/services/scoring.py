@@ -256,7 +256,12 @@ def estimate_dscr(prop: Property, current_year: int | None = None) -> float:
     annual_debt_service = payment * 12
     if annual_debt_service <= 0:
         return 0.0
-    return round(noi / annual_debt_service, 2)
+    dscr = round(noi / annual_debt_service, 2)
+    # Outside a plausible band the estimate is unreliable (bad SF/rent/loan data,
+    # often mobile-home/RV parks) — report unknown rather than a fake 0.05x.
+    if dscr < 0.4 or dscr > 10:
+        return 0.0
+    return dscr
 
 
 def debt_pressure(prop: Property, current_year: int) -> float:

@@ -84,6 +84,14 @@ export function getMarkets() {
   return fetchJson<MarketOption[]>("/api/markets", []);
 }
 
+export function getDebtWatch(limit = 200) {
+  const params = new URLSearchParams();
+  params.set("data_scope", "live");
+  params.set("limit", String(limit));
+  withMarket(params);
+  return fetchJson<PropertyOpportunity[]>(`/api/debt-watch?${params.toString()}`, []);
+}
+
 export function getMapPoints(dataScope?: string) {
   const params = new URLSearchParams();
   if (dataScope) params.set("data_scope", dataScope);

@@ -39,6 +39,7 @@ export type PropertyOpportunity = {
   interest_rate?: number;
   loan_amount?: number;
   dscr?: number;
+  debt_pressure?: number;
   year_renovated?: number;
   effective_rent?: number;
   owner_contact?: string;

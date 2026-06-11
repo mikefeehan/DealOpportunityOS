@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import date
 from statistics import mean
 from typing import Any
 
@@ -11,6 +12,7 @@ from backend.app.models import OpportunityScore, Pipeline, Property
 from backend.app.services.scoring import (
     INTRUST_MODE_OWNER_STATES,
     PIPELINE_STAGES,
+    debt_pressure,
     estimate_dscr,
     is_institutional_owner,
     is_private_owner,
@@ -64,6 +66,7 @@ def property_to_dict(prop: Property) -> dict[str, Any]:
         "interest_rate": prop.interest_rate,
         "loan_amount": prop.loan_amount,
         "dscr": estimate_dscr(prop),
+        "debt_pressure": round(debt_pressure(prop, date.today().year)),
         "year_renovated": prop.year_renovated,
         "effective_rent": prop.effective_rent,
         "owner_contact": prop.owner_contact,
@@ -232,6 +235,33 @@ def get_ranked_properties(
         recommendation=recommendation,
     )
     payload = [property_to_dict(prop) for prop in props]
+    return payload[:limit] if limit else payload
+
+
+def get_debt_opportunities(
+    db: Session,
+    data_scope: str | None = None,
+    market: str | None = None,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    """Properties with maturing/under-water debt — ranked by debt pressure.
+
+    No hold-period or owner filter: a loan coming due is the opportunity. Includes
+    loans maturing in the next ~5 years (and recently matured, not yet stale) or
+    thin estimated DSCR.
+    """
+    year = date.today().year
+    scope = resolve_scope(db, data_scope)
+    rows: list[Property] = []
+    for prop in query_properties(db, scope=scope, market=market):
+        maturity = prop.loan_maturity_year or 0
+        upcoming = bool(maturity) and (year - 1) <= maturity <= (year + 5)
+        dscr = estimate_dscr(prop, year)
+        distressed = bool(dscr) and dscr < 1.2
+        if upcoming or distressed:
+            rows.append(prop)
+    rows.sort(key=lambda prop: debt_pressure(prop, year), reverse=True)
+    payload = [property_to_dict(prop) for prop in rows]
     return payload[:limit] if limit else payload
 
 

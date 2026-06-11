@@ -18,6 +18,7 @@ from backend.app.services.geocoding import geocode_missing
 from backend.app.services.importer import import_universe
 from backend.app.services.market_context import load_market_context
 from backend.app.services.ranking import (
+    get_debt_opportunities,
     get_map_points,
     get_market_summary,
     get_owner_profile,
@@ -89,6 +90,16 @@ def market_context() -> dict:
 @app.get("/api/markets")
 def markets(db: Session = Depends(get_db)) -> list[dict]:
     return list_markets(db)
+
+
+@app.get("/api/debt-watch")
+def debt_watch(
+    data_scope: str | None = Query(None),
+    market: str | None = Query(None),
+    limit: int | None = Query(None, ge=1, le=500),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    return get_debt_opportunities(db, data_scope=data_scope, market=market, limit=limit)
 
 
 @app.get("/api/map")
