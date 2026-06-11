@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from io import BytesIO, StringIO
+from pathlib import Path
 from typing import Any
 
 from xml.sax.saxutils import escape
@@ -9,10 +10,17 @@ from xml.sax.saxutils import escape
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape, letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.lib.utils import ImageReader
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy.orm import Session
 
 from backend.app.services.ranking import get_ranked_properties, get_today_call_list
+
+# InTrust brand palette (from brand guidelines).
+BRAND_BLUE = colors.HexColor("#12648a")  # PMS 7706
+BRAND_GREY = colors.HexColor("#a1a0a0")  # PMS 422
+BRAND_ROW = colors.HexColor("#eef3f6")   # light blue-grey for alternating rows
+_LOGO_PATH = Path(__file__).resolve().parents[3] / "frontend" / "public" / "brand" / "intrust-color.png"
 
 
 def build_opportunities_csv(db: Session) -> str:
@@ -76,8 +84,9 @@ def build_opportunities_csv(db: Session) -> str:
 
 # Paragraph styles so long cells (owner, property, why-call) wrap within their
 # column instead of overflowing the page.
-_CELL = ParagraphStyle("cell", fontName="Helvetica", fontSize=7, leading=8.5, textColor=colors.HexColor("#111111"))
-_HEAD = ParagraphStyle("head", fontName="Helvetica-Bold", fontSize=7.5, leading=9, textColor=colors.HexColor("#E8C15A"))
+_CELL = ParagraphStyle("cell", fontName="Helvetica", fontSize=7, leading=8.5, textColor=colors.HexColor("#1a1a1a"))
+_HEAD = ParagraphStyle("head", fontName="Helvetica-Bold", fontSize=7.5, leading=9, textColor=colors.white)
+_SECTION = ParagraphStyle("section", fontName="Helvetica-Bold", fontSize=13, leading=16, textColor=BRAND_BLUE, spaceBefore=4, spaceAfter=4)
 
 
 def _p(text: Any, style: ParagraphStyle = _CELL) -> Paragraph:
@@ -85,8 +94,7 @@ def _p(text: Any, style: ParagraphStyle = _CELL) -> Paragraph:
 
 
 def _call_list_table(title: str, rows: list[dict[str, Any]], owner_rows: bool = True) -> list[Any]:
-    styles = getSampleStyleSheet()
-    story: list[Any] = [Paragraph(title, styles["Heading2"])]
+    story: list[Any] = [Paragraph(title, _SECTION)]
     headers = ["Owner", "Phone", "Property", "Units", "Held", "Call", "Why Call"]
     data = [[_p(h, _HEAD) for h in headers]]
     for row in rows:
@@ -108,12 +116,13 @@ def _call_list_table(title: str, rows: list[dict[str, Any]], owner_rows: bool = 
     table.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#111111")),
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#555555")),
+                ("BACKGROUND", (0, 0), (-1, 0), BRAND_BLUE),
+                ("GRID", (0, 0), (-1, -1), 0.4, BRAND_GREY),
+                ("LINEBELOW", (0, 0), (-1, 0), 0.8, BRAND_BLUE),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("TOPPADDING", (0, 0), (-1, -1), 3),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#F8F8F8"), colors.white]),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [BRAND_ROW, colors.white]),
             ]
         )
     )
@@ -133,15 +142,26 @@ def build_today_call_list_pdf(db: Session) -> bytes:
         bottomMargin=24,
         title="InTrust Today Call List - Tucson",
     )
-    styles = getSampleStyleSheet()
-    story: list[Any] = [
-        Paragraph("InTrust Tucson Today's Call List", styles["Title"]),
-        Paragraph(
-            "Owner-first off-market acquisition priorities. Sorted by Call Score: 50% Fit Score + 50% Motivation Score.",
-            styles["BodyText"],
-        ),
-        Spacer(1, 10),
-    ]
+    title_style = ParagraphStyle(
+        "title", fontName="Helvetica-Bold", fontSize=20, leading=24, textColor=BRAND_BLUE, spaceAfter=2
+    )
+    sub_style = ParagraphStyle("sub", fontName="Helvetica", fontSize=9, leading=12, textColor=BRAND_GREY)
+    story: list[Any] = []
+    if _LOGO_PATH.exists():
+        width, height = ImageReader(str(_LOGO_PATH)).getSize()
+        logo = Image(str(_LOGO_PATH), width=150, height=150 * height / width)
+        logo.hAlign = "LEFT"
+        story.extend([logo, Spacer(1, 6)])
+    story.extend(
+        [
+            Paragraph("Today's Call List", title_style),
+            Paragraph(
+                "Owner-first off-market acquisition priorities. Sorted by Call Score: 50% Fit Score + 50% Motivation Score.",
+                sub_style,
+            ),
+            Spacer(1, 10),
+        ]
+    )
     story.extend(_call_list_table("Top 10 Owners", call_list["top_10_owners"], owner_rows=True))
     story.extend(_call_list_table("Top New Opportunities", call_list["top_new_opportunities"], owner_rows=False))
     story.extend(_call_list_table("Top 25 Owners", call_list["top_25_owners"], owner_rows=True))
