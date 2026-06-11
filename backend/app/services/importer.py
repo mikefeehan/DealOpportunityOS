@@ -55,6 +55,13 @@ COLUMN_ALIASES: dict[str, list[str]] = {
     "owner_name": ["owner", "ownername", "ownership", "ownershipentity", "trueowner"],
     "owner_city": ["ownercity", "mailingcity"],
     "owner_state": ["ownerstate", "mailingstate", "ownerst"],
+    "owner_contact": ["ownercontact", "ownercontactname"],
+    "owner_contact_first": ["ownercontactfirstname"],
+    "owner_contact_last": ["ownercontactlastname"],
+    "owner_phone": ["ownercontactphonenumber", "ownerphone", "ownercontactphone"],
+    "owner_email": ["ownercontactemail", "owneremail"],
+    "owner_website": ["ownerwebsite"],
+    "manager_phone": ["managercontactphonenumber", "managerphone"],
     "latitude": ["latitude", "lat"],
     "longitude": ["longitude", "lon", "lng", "long"],
     "last_sale_year": ["lastsaleyear", "yearpurchased", "saleyear", "acquired", "acquisitionyear", "purchaseyear", "latestsaledate", "saledate", "lastsaledate"],
@@ -173,6 +180,13 @@ def _to_float(value: Any) -> float:
 
 def _to_bool_yes(value: Any) -> bool:
     return str(value or "").strip().upper() in {"Y", "YES", "TRUE", "1"}
+
+
+def _clean_contact(value: str) -> str:
+    text = (value or "").strip()
+    if text.upper() in {"NOT AVAILABLE", "N/A", "NA", "NONE", "UNKNOWN", "-"}:
+        return ""
+    return text
 
 
 def _to_year(value: Any) -> int:
@@ -487,6 +501,9 @@ def import_universe(
         loan_maturity_year = _to_year(get(row, "loan_maturity"))
         year_renovated = _to_year(get(row, "year_renovated"))
 
+        owner_contact = get(row, "owner_contact").strip() or " ".join(
+            part for part in [get(row, "owner_contact_first").strip(), get(row, "owner_contact_last").strip()] if part
+        )
         latitude = _to_float(get(row, "latitude")) or _to_float(pima.get("latitude", 0)) or 0.0
         longitude = _to_float(get(row, "longitude")) or _to_float(pima.get("longitude", 0)) or 0.0
         assessed_value = _to_float(pima.get("assessed_value", 0)) or last_sale_price or units * 95_000
@@ -532,6 +549,11 @@ def import_universe(
             "affordable": affordable,
             "affordable_type": affordable_type,
             "loan_maturity_year": loan_maturity_year,
+            "owner_contact": _clean_contact(owner_contact),
+            "owner_phone": _clean_contact(get(row, "owner_phone")),
+            "owner_email": _clean_contact(get(row, "owner_email")),
+            "owner_website": _clean_contact(get(row, "owner_website")),
+            "manager_phone": _clean_contact(get(row, "manager_phone")),
             "data_status": "live_authorized",
             "match_status": match_status,
             "match_confidence": confidence,

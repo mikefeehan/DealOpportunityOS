@@ -38,6 +38,11 @@ export type PropertyOpportunity = {
   loan_maturity_year?: number;
   year_renovated?: number;
   effective_rent?: number;
+  owner_contact?: string;
+  owner_phone?: string;
+  owner_email?: string;
+  owner_website?: string;
+  manager_phone?: string;
   source: string;
   source_name: string;
   source_url: string;
@@ -71,6 +76,11 @@ export type OwnerProfile = {
   owner: string;
   data_status: string;
   mailing_address: string;
+  owner_contact?: string;
+  owner_phone?: string;
+  owner_email?: string;
+  owner_website?: string;
+  manager_phone?: string;
   owner_city: string;
   owner_state: string;
   properties_owned: number;

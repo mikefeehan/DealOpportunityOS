@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Brain, Building2, MapPin } from "lucide-react";
+import { Brain, Building2, Globe, Mail, MapPin, Phone, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { generateCallPrep, getOwner } from "@/lib/api";
 import type { CallPrep, OwnerProfile } from "@/lib/types";
@@ -71,6 +71,43 @@ export function OwnerDetailPage({ ownerName }: { ownerName: string }) {
                 {owner.mailing_address}
               </div>
             </div>
+            {(owner.owner_phone || owner.owner_email || owner.owner_contact || owner.owner_website || owner.manager_phone) && (
+              <div className="rounded-md border border-amber/30 bg-amber/5 p-3">
+                <div className="text-xs uppercase text-amber">Contact</div>
+                <div className="mt-2 grid gap-1.5 text-sm">
+                  {owner.owner_contact && (
+                    <div className="flex items-center gap-2 text-ink">
+                      <User size={14} className="text-muted" />
+                      {owner.owner_contact}
+                    </div>
+                  )}
+                  {owner.owner_phone && (
+                    <a href={`tel:${owner.owner_phone}`} className="flex items-center gap-2 text-ink hover:text-amber">
+                      <Phone size={14} className="text-muted" />
+                      {owner.owner_phone}
+                    </a>
+                  )}
+                  {owner.owner_email && (
+                    <a href={`mailto:${owner.owner_email}`} className="flex items-center gap-2 text-ink hover:text-amber">
+                      <Mail size={14} className="text-muted" />
+                      {owner.owner_email}
+                    </a>
+                  )}
+                  {owner.owner_website && (
+                    <a href={owner.owner_website.startsWith("http") ? owner.owner_website : `https://${owner.owner_website}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-ink hover:text-amber">
+                      <Globe size={14} className="text-muted" />
+                      {owner.owner_website}
+                    </a>
+                  )}
+                  {owner.manager_phone && owner.manager_phone !== owner.owner_phone && (
+                    <div className="flex items-center gap-2 text-muted">
+                      <Phone size={14} />
+                      {owner.manager_phone} <span className="text-xs">(manager)</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Metric label="Properties" value={owner.properties_owned} />
               <Metric label="Units" value={formatNumber(owner.units_owned)} />

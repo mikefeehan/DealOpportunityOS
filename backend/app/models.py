@@ -61,6 +61,14 @@ class Property(Base):
     year_renovated: Mapped[int] = mapped_column(Integer, default=0)
     effective_rent: Mapped[float] = mapped_column(Float, default=0)
 
+    # Owner contactability (from the source exports; e.g. Yardi has a phone for
+    # nearly every owner). Skip-trace APIs can fill the email gap later.
+    owner_contact: Mapped[str] = mapped_column(String(160), default="")
+    owner_phone: Mapped[str] = mapped_column(String(40), default="")
+    owner_email: Mapped[str] = mapped_column(String(160), default="")
+    owner_website: Mapped[str] = mapped_column(String(200), default="")
+    manager_phone: Mapped[str] = mapped_column(String(40), default="")
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

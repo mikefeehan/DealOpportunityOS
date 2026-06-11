@@ -61,6 +61,11 @@ def property_to_dict(prop: Property) -> dict[str, Any]:
         "loan_maturity_year": prop.loan_maturity_year,
         "year_renovated": prop.year_renovated,
         "effective_rent": prop.effective_rent,
+        "owner_contact": prop.owner_contact,
+        "owner_phone": prop.owner_phone,
+        "owner_email": prop.owner_email,
+        "owner_website": prop.owner_website,
+        "manager_phone": prop.manager_phone,
         "source": prop.source,
         "source_name": prop.source_name,
         "source_url": prop.source_url,
@@ -288,10 +293,22 @@ def get_owner_profiles(
             if all((prop.data_status or "seeded_fallback") == "seeded_fallback" for prop in owned)
             else "live"
         )
+        def first_nonempty(attr: str) -> str:
+            for prop in owned:
+                value = getattr(prop, attr, "") or ""
+                if value:
+                    return value
+            return ""
+
         profile = {
             "owner": owner_name,
             "data_status": owner_data_status,
             "mailing_address": owned[0].mailing_address,
+            "owner_contact": first_nonempty("owner_contact"),
+            "owner_phone": first_nonempty("owner_phone"),
+            "owner_email": first_nonempty("owner_email"),
+            "owner_website": first_nonempty("owner_website"),
+            "manager_phone": first_nonempty("manager_phone"),
             "owner_city": owned[0].owner_city,
             "owner_state": owner_state,
             "properties_owned": len(owned),
