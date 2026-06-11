@@ -71,9 +71,9 @@ export function OwnerDetailPage({ ownerName }: { ownerName: string }) {
                 {owner.mailing_address}
               </div>
             </div>
-            {(owner.owner_phone || owner.owner_email || owner.owner_contact || owner.owner_website || owner.manager_phone) && (
+            {(owner.owner_phone || owner.owner_email || owner.owner_contact || owner.owner_website) && (
               <div className="rounded-md border border-amber/30 bg-amber/5 p-3">
-                <div className="text-xs uppercase text-amber">Contact</div>
+                <div className="text-xs uppercase text-amber">Owner contact</div>
                 <div className="mt-2 grid gap-1.5 text-sm">
                   {owner.owner_contact && (
                     <div className="flex items-center gap-2 text-ink">
@@ -98,12 +98,6 @@ export function OwnerDetailPage({ ownerName }: { ownerName: string }) {
                       <Globe size={14} className="text-muted" />
                       {owner.owner_website}
                     </a>
-                  )}
-                  {owner.manager_phone && owner.manager_phone !== owner.owner_phone && (
-                    <div className="flex items-center gap-2 text-muted">
-                      <Phone size={14} />
-                      {owner.manager_phone} <span className="text-xs">(manager)</span>
-                    </div>
                   )}
                 </div>
               </div>

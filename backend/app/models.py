@@ -70,7 +70,6 @@ class Property(Base):
     owner_phone: Mapped[str] = mapped_column(String(40), default="")
     owner_email: Mapped[str] = mapped_column(String(160), default="")
     owner_website: Mapped[str] = mapped_column(String(200), default="")
-    manager_phone: Mapped[str] = mapped_column(String(40), default="")
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -46,7 +46,6 @@ export type PropertyOpportunity = {
   owner_phone?: string;
   owner_email?: string;
   owner_website?: string;
-  manager_phone?: string;
   source: string;
   source_name: string;
   source_url: string;
@@ -84,7 +83,6 @@ export type OwnerProfile = {
   owner_phone?: string;
   owner_email?: string;
   owner_website?: string;
-  manager_phone?: string;
   owner_city: string;
   owner_state: string;
   properties_owned: number;

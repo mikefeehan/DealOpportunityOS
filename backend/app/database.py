@@ -64,7 +64,6 @@ _ADDED_PROPERTY_COLUMNS = {
     "owner_phone": "VARCHAR(40) DEFAULT ''",
     "owner_email": "VARCHAR(160) DEFAULT ''",
     "owner_website": "VARCHAR(200) DEFAULT ''",
-    "manager_phone": "VARCHAR(40) DEFAULT ''",
 }
 
 
