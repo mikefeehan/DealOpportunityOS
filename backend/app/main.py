@@ -14,6 +14,7 @@ from backend.app.models import Pipeline, Property
 from backend.app.services.ai_insights import generate_ai_call_prep
 from backend.app.services.exports import build_opportunities_csv, build_today_call_list_pdf
 from backend.app.services.importer import import_universe
+from backend.app.services.market_context import load_market_context
 from backend.app.services.ranking import (
     get_market_summary,
     get_owner_profile,
@@ -74,6 +75,11 @@ def scan_tucson(db: Session = Depends(get_db)) -> dict:
 @app.get("/api/market/summary")
 def market_summary(db: Session = Depends(get_db)) -> dict:
     return get_market_summary(db)
+
+
+@app.get("/api/market/context")
+def market_context() -> dict:
+    return load_market_context()
 
 
 @app.get("/api/today-call-list")

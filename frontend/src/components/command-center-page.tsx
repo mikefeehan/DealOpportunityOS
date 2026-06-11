@@ -1,15 +1,72 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, BriefcaseBusiness, Building2, CheckCircle2, Handshake, Phone, Target, Users } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, Building2, CheckCircle2, Handshake, LineChart, Phone, Target, Users } from "lucide-react";
 import { useEffect, useState } from "react";
-import { getOwners, getOpportunities, getSummary } from "@/lib/api";
-import type { MarketSummary, OwnerProfile, PropertyOpportunity } from "@/lib/types";
-import { formatNumber, ownerHref } from "@/lib/utils";
+import { getMarketContext, getOwners, getOpportunities, getSummary } from "@/lib/api";
+import type { MarketContext, MarketSummary, OwnerProfile, PropertyOpportunity } from "@/lib/types";
+import { formatMoney, formatNumber, ownerHref } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeading } from "@/components/page-heading";
 import { ScorePill } from "@/components/score-pill";
+
+function ContextMetric({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="rounded-md border border-border bg-panel2 p-3">
+      <div className="text-xs uppercase text-muted">{label}</div>
+      <div className="mt-1 text-lg font-semibold text-ink">{value}</div>
+      {sub && <div className="mt-0.5 text-xs text-muted">{sub}</div>}
+    </div>
+  );
+}
+
+function pct(value?: number | null) {
+  if (value === null || value === undefined) return "—";
+  return `${value > 0 ? "+" : ""}${value}%`;
+}
+
+function MarketContextPanel({ ctx }: { ctx: MarketContext }) {
+  if (!ctx.available) return null;
+  const { rent, supply, demographics } = ctx;
+  return (
+    <Card className="mt-4">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2">
+          <LineChart size={16} className="text-amber" />
+          Tucson Market Context
+        </CardTitle>
+        <Badge tone="cyan">HelloData{ctx.as_of ? ` · ${ctx.as_of}` : ""}</Badge>
+      </CardHeader>
+      <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <ContextMetric
+          label="Avg Effective Rent"
+          value={rent.avg_effective ? formatMoney(rent.avg_effective, false) : "—"}
+          sub={rent.avg_asking ? `${formatMoney(rent.avg_asking, false)} asking · ${pct(rent.concession_pct ? -rent.concession_pct : null)} concession` : undefined}
+        />
+        <ContextMetric label="Rent Growth (YoY)" value={pct(rent.growth_yoy)} sub="market median" />
+        <ContextMetric
+          label="Supply Pipeline"
+          value={supply.pipeline_total_units ? `${formatNumber(supply.pipeline_total_units)} units` : "—"}
+          sub={supply.under_construction_units ? `${formatNumber(supply.under_construction_units)} under construction` : undefined}
+        />
+        <ContextMetric
+          label="Market Size"
+          value={supply.existing_units ? `${formatNumber(supply.existing_units)} units` : "—"}
+          sub={supply.existing_properties ? `${formatNumber(supply.existing_properties)} properties` : undefined}
+        />
+        <ContextMetric label="Population" value={demographics.population ? formatNumber(demographics.population) : "—"} />
+        <ContextMetric label="Median Income" value={demographics.median_income ? formatMoney(demographics.median_income, false) : "—"} />
+        <ContextMetric label="Employment Rate" value={demographics.employment_rate ? `${demographics.employment_rate}%` : "—"} />
+        <ContextMetric
+          label="Comp Set"
+          value={ctx.comp_set.properties ? `${formatNumber(ctx.comp_set.properties)} props` : "—"}
+          sub={ctx.comp_set.median_rent ? `${formatMoney(ctx.comp_set.median_rent, false)} median rent` : undefined}
+        />
+      </CardContent>
+    </Card>
+  );
+}
 
 const statIcons = [Building2, Target, Users, BriefcaseBusiness, Phone];
 
@@ -34,9 +91,11 @@ export function CommandCenterPage() {
   const [summary, setSummary] = useState<MarketSummary | null>(null);
   const [owners, setOwners] = useState<OwnerProfile[]>([]);
   const [properties, setProperties] = useState<PropertyOpportunity[]>([]);
+  const [context, setContext] = useState<MarketContext | null>(null);
 
   useEffect(() => {
     getSummary().then(setSummary);
+    getMarketContext().then(setContext);
     getOwners(true, 8).then(setOwners);
     getOpportunities({ intrust_mode: true, limit: 8 }).then(setProperties);
   }, []);
@@ -46,7 +105,8 @@ export function CommandCenterPage() {
   return (
     <div>
       <PageHeading eyebrow="Market Command Center" title="Tucson Acquisition Pulse" />
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      {context && <MarketContextPanel ctx={context} />}
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Total Properties" value={summary?.total_properties ?? 0} index={0} />
         <StatCard label="High Score Targets" value={summary?.high_score_targets ?? 0} index={1} />
         <StatCard label="Long Hold Owners" value={summary?.long_hold_owners ?? 0} index={2} />

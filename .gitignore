@@ -18,3 +18,4 @@ opportunityos-home.png
 # Licensed market data exports (HelloData etc.) — keep the folder, not the data
 data/market_reference/*.csv
 data/market_reference/*.xlsx
+data/market_reference/*.pdf

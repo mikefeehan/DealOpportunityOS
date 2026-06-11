@@ -7,6 +7,7 @@ import {
 import type {
   CallPrep,
   ImportSummary,
+  MarketContext,
   MarketSummary,
   OwnerProfile,
   PipelinePayload,
@@ -53,6 +54,18 @@ export function getTodayCallList(dataScope?: string) {
 
 export function getSummary() {
   return fetchJson<MarketSummary>("/api/market/summary", fallbackSummary);
+}
+
+export function getMarketContext() {
+  return fetchJson<MarketContext>("/api/market/context", {
+    available: false,
+    as_of: null,
+    source: "HelloData Market Analytics",
+    rent: {},
+    supply: {},
+    demographics: {},
+    comp_set: {}
+  });
 }
 
 export function getOwners(intrustMode = false, limit?: number) {

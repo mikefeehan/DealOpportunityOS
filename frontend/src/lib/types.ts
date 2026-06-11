@@ -108,6 +108,34 @@ export type MarketSummary = {
   pipeline: Record<string, number>;
 };
 
+export type MarketContext = {
+  available: boolean;
+  as_of: string | null;
+  source: string;
+  rent: {
+    avg_asking?: number | null;
+    avg_effective?: number | null;
+    concession_pct?: number | null;
+    growth_yoy?: number | null;
+  };
+  supply: {
+    existing_properties?: number | null;
+    existing_units?: number | null;
+    in_planning_units?: number | null;
+    under_construction_units?: number | null;
+    pipeline_total_units?: number | null;
+  };
+  demographics: {
+    population?: number | null;
+    median_income?: number | null;
+    employment_rate?: number | null;
+  };
+  comp_set: {
+    properties?: number | null;
+    median_rent?: number | null;
+  };
+};
+
 export type TodayCallList = {
   top_10_owners: OwnerProfile[];
   top_25_owners: OwnerProfile[];

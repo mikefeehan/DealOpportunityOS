@@ -66,6 +66,10 @@ TUCSON_SUBMARKET_RENT = {
 }
 DEFAULT_SUBMARKET_RENT = 1250
 
+# HelloData's Tucson market runs ~2.2% concessions (asking $1,523 vs effective
+# $1,489), so discount asking market rents to net-effective for honest rent gaps.
+NET_EFFECTIVE_FACTOR = 0.978
+
 # Property status values that mean the asset is not yet a stabilized, operating
 # acquisition target (kept out of the call list).
 PREOPEN_STATUS_KEYWORDS = (
@@ -426,6 +430,10 @@ def import_universe(
                     average_rent = hellodata_rent
             elif average_rent and average_rent > 0:
                 market_rent = estimate_market_rent(submarket, average_rent, year_built)
+            # Discount asking market rent to net-effective so rent gaps reflect
+            # what an owner actually collects, not the advertised number.
+            if market_rent:
+                market_rent = round(market_rent * NET_EFFECTIVE_FACTOR)
         assessed_value = _to_float(pima.get("assessed_value", 0)) or units * 95_000
         row_source = get(row, "source").strip()
         property_type = "Under Construction" if _is_preopen(status, year_built, datetime.utcnow().year) else "Apartments"
