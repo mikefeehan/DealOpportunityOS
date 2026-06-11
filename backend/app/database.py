@@ -58,6 +58,7 @@ _ADDED_PROPERTY_COLUMNS = {
     "loan_maturity_year": "INTEGER DEFAULT 0",
     "interest_rate": "FLOAT DEFAULT 0",
     "loan_amount": "FLOAT DEFAULT 0",
+    "lender": "VARCHAR(120) DEFAULT ''",
     "year_renovated": "INTEGER DEFAULT 0",
     "effective_rent": "FLOAT DEFAULT 0",
     "owner_contact": "VARCHAR(160) DEFAULT ''",

@@ -28,6 +28,7 @@ type SortKey =
   | "interest_rate"
   | "dscr"
   | "loan_amount"
+  | "lender"
   | "debt_pressure"
   | "call_score";
 
@@ -39,6 +40,7 @@ const COLUMNS: Array<[SortKey, string]> = [
   ["interest_rate", "Rate"],
   ["dscr", "Est. DSCR"],
   ["loan_amount", "Loan"],
+  ["lender", "Lender"],
   ["debt_pressure", "Pressure"],
   ["call_score", "Call"]
 ];
@@ -105,7 +107,7 @@ export function DebtWatchPage() {
             </div>
           ) : (
             <div className="overflow-x-auto scrollbar-thin">
-              <table className="w-full min-w-[1080px] border-collapse text-left">
+              <table className="w-full min-w-[1240px] border-collapse text-left">
                 <thead className="bg-panel2 text-xs uppercase text-muted">
                   <tr>
                     {COLUMNS.map(([key, label]) => (
@@ -140,6 +142,7 @@ export function DebtWatchPage() {
                         {row.dscr ? row.dscr.toFixed(2) : "—"}
                       </td>
                       <td className="px-3 py-3 text-sm text-ink">{row.loan_amount ? formatMoney(row.loan_amount) : "—"}</td>
+                      <td className="px-3 py-3 text-sm text-ink">{row.lender || "—"}</td>
                       <td className="px-3 py-3 text-sm font-semibold text-amber">{row.debt_pressure ?? 0}</td>
                       <td className="px-3 py-3"><ScorePill value={row.call_score} /></td>
                       <td className="max-w-md px-3 py-3 text-sm text-muted">{row.why_now}</td>

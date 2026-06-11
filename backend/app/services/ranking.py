@@ -65,6 +65,7 @@ def property_to_dict(prop: Property) -> dict[str, Any]:
         "loan_maturity_year": prop.loan_maturity_year,
         "interest_rate": prop.interest_rate,
         "loan_amount": prop.loan_amount,
+        "lender": prop.lender,
         "dscr": estimate_dscr(prop),
         "debt_pressure": round(debt_pressure(prop, date.today().year)),
         "year_renovated": prop.year_renovated,

@@ -100,7 +100,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="flex min-h-16 flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between lg:px-6">
             <div>
               <div className="text-xs uppercase text-muted">Internal acquisition intelligence</div>
-              <div className="text-lg font-semibold text-ink">Who should InTrust call this week?</div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {markets.length > 0 && (

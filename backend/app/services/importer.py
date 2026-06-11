@@ -80,6 +80,7 @@ COLUMN_ALIASES: dict[str, list[str]] = {
     "loan_maturity": ["maturitydate", "loanmaturitydate", "loanmaturity"],
     "interest_rate": ["interestrate", "loaninterestrate"],
     "loan_amount": ["originationamount", "loanamount", "originalloanamount", "loanorigination"],
+    "lender": ["originator", "lender", "loanoriginator", "lendername"],
     "source": ["source", "datasource", "provider"],
 }
 
@@ -570,6 +571,7 @@ def import_universe(
             "loan_maturity_year": loan_maturity_year,
             "interest_rate": interest_rate,
             "loan_amount": loan_amount,
+            "lender": _clean_contact(get(row, "lender")),
             "owner_contact": _clean_contact(owner_contact),
             "owner_phone": _clean_contact(get(row, "owner_phone")),
             "owner_email": _clean_contact(get(row, "owner_email")),
