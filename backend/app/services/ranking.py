@@ -115,6 +115,7 @@ def query_properties(db: Session, scope: str | None = None) -> list[Property]:
         .options(joinedload(Property.score), joinedload(Property.pipeline))
         .join(OpportunityScore)
         .where(Property.units >= 50)
+        .where(Property.property_type != "Under Construction")
         .order_by(OpportunityScore.call_score.desc(), OpportunityScore.acquisition_score.desc())
     )
     if scope == "verified":

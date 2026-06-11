@@ -40,6 +40,8 @@ COLUMN_ALIASES: dict[str, list[str]] = {
     "city": ["propertycity", "sitecity", "city"],
     "prop_state": ["propertystate", "sitestate", "state"],
     "zip": ["zip", "zipcode", "postalcode", "propertyzip", "sitezip"],
+    "submarket": ["submarket", "submkt"],
+    "status": ["propertyspecialstatus", "specialstatus", "propertystatus", "status", "constructionstatus"],
     "units": ["units", "unitcount", "nounits", "noofunits", "totalunits", "numberofunits", "unit", "doors"],
     "year_built": ["yearbuilt", "built", "yrbuilt", "vintage", "yearbuiltoriginal", "constructionyear", "completiondate", "yearcompleted", "completionyear"],
     "average_rent": ["averagerent", "avgrent", "currentrent", "inplacerent", "rent", "effectiverent", "actualrent", "latestmonthlyrent", "monthlyrent", "avgmarketrent"],
@@ -53,6 +55,53 @@ COLUMN_ALIASES: dict[str, list[str]] = {
 
 REQUIRED_ANY = ["address", "name"]  # need at least one identifier
 DEFAULT_LAST_SALE_YEAR = 2012  # neutral placeholder when an import omits sale year
+
+# Modeled Tucson submarket market-rent benchmarks ($/unit/mo). These are estimates
+# used to derive rent upside when an export lacks a market/pro-forma rent column.
+TUCSON_SUBMARKET_RENT = {
+    "foothills": 1475, "oro valley": 1450, "catalina": 1425, "northwest": 1350, "marana": 1375,
+    "north": 1350, "university": 1325, "downtown": 1375, "central": 1300, "northeast": 1325,
+    "east": 1300, "midtown": 1275, "airport": 1100, "southwest": 1125, "south": 1100, "west": 1175,
+}
+DEFAULT_SUBMARKET_RENT = 1250
+
+# Property status values that mean the asset is not yet a stabilized, operating
+# acquisition target (kept out of the call list).
+PREOPEN_STATUS_KEYWORDS = (
+    "construction", "prospective", "planned", "proposed", "pre-leasing", "preleasing",
+    "lease-up", "leaseup", "renovation", "under development", "predevelopment",
+)
+
+
+def _submarket_benchmark(submarket: str) -> int:
+    text = (submarket or "").lower()
+    for key, value in TUCSON_SUBMARKET_RENT.items():
+        if key in text:
+            return value
+    return DEFAULT_SUBMARKET_RENT
+
+
+def estimate_market_rent(submarket: str, average_rent: float, year_built: int) -> float:
+    """Estimate market rent from a submarket benchmark when no market rent is given.
+
+    Below-benchmark assets get the benchmark (upside); above-benchmark assets get a
+    modest loss-to-lease, larger for older vintage. Returns 0 when in-place rent is
+    unknown so no false upside is invented.
+    """
+    if not average_rent or average_rent <= 0:
+        return 0.0
+    benchmark = _submarket_benchmark(submarket)
+    if benchmark > average_rent:
+        return float(round(benchmark))
+    uplift = 1.08 if (year_built and year_built <= 2010) else 1.04
+    return float(round(average_rent * uplift))
+
+
+def _is_preopen(status: str, year_built: int, current_year: int) -> bool:
+    text = (status or "").lower()
+    if any(keyword in text for keyword in PREOPEN_STATUS_KEYWORDS):
+        return True
+    return bool(year_built and year_built > current_year)
 
 
 def _normalize_header(header: str) -> str:
@@ -356,12 +405,17 @@ def import_universe(
         # owner is a key motivation signal). Fall back to a neutral placeholder
         # only when neither a sale date nor a build year is available.
         last_sale_year = _to_year(get(row, "last_sale_year")) or year_built or DEFAULT_LAST_SALE_YEAR
+        submarket = get(row, "submarket").strip() or "Tucson"
+        status = get(row, "status").strip()
         average_rent = _to_float(get(row, "average_rent"))
         market_rent = _to_float(get(row, "market_rent"))
         if market_rent and not average_rent:
             average_rent = round(market_rent * 0.82, 0)
+        if not market_rent:
+            market_rent = estimate_market_rent(submarket, average_rent, year_built)
         assessed_value = _to_float(pima.get("assessed_value", 0)) or units * 95_000
         row_source = get(row, "source").strip()
+        property_type = "Under Construction" if _is_preopen(status, year_built, datetime.utcnow().year) else "Apartments"
 
         payload = {
             "parcel_id": parcel_id,
@@ -375,8 +429,8 @@ def import_universe(
             "mailing_address": pima.get("mailing_address") or "Mailing address pending parcel match",
             "latitude": pima.get("latitude") or 32.2226,
             "longitude": pima.get("longitude") or -110.9747,
-            "property_type": "Apartments",
-            "submarket": "Tucson",
+            "property_type": property_type,
+            "submarket": submarket,
             "owner_city": get(row, "owner_city").strip() or pima.get("owner_city") or "",
             "owner_state": (get(row, "owner_state").strip() or pima.get("owner_state") or "").upper(),
             "source": f"{source_label}: {row_source}" if row_source else source_label,

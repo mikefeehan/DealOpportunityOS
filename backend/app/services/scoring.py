@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -54,10 +55,38 @@ def is_institutional_owner(owner_name: str) -> bool:
     return any(token in owner for token in ["REIT", "INSTITUTIONAL", "FUND IV", "FUND V", "BLACKSTONE", "GREYSTAR"])
 
 
-def is_private_owner(owner_name: str) -> bool:
-    owner = owner_name.upper()
-    if is_institutional_owner(owner):
+# Tokens that mark a name as a business entity rather than an individual.
+_ENTITY_TOKENS = (
+    "LLC", "L.L.C", "LP", "L.P.", "INC", "CORP", "COMPANY", "PARTNERS", "PARTNERSHIP", "HOLDINGS",
+    "GROUP", "PROPERTIES", "APARTMENTS", "FUND", "CAPITAL", "REIT", "ASSOCIATES", "VENTURES",
+    "INVESTMENT", "INVESTMENTS", "REALTY", "RESIDENTIAL", "COMMUNITIES", "DEVELOPMENT", "MANAGEMENT",
+    "HOMES", "HOUSING", "TRUST", "FAMILY", "ESTATE",
+)
+
+
+def is_individual_owner(owner_name: str) -> bool:
+    """A person-owner (e.g. "Heric, Carla G." or "Gerald Gray") — not an entity.
+
+    Individuals are prime owner-first targets (succession, long hold, 721), so the
+    engine treats them as private and high-motivation rather than generic.
+    """
+    owner = (owner_name or "").upper().strip()
+    if not owner or is_institutional_owner(owner):
         return False
+    if any(token in owner for token in _ENTITY_TOKENS):
+        return False
+    if "," in owner:  # "Lastname, Firstname"
+        return True
+    words = [w for w in re.split(r"[\s.]+", owner) if w]
+    return 2 <= len(words) <= 3 and all(re.fullmatch(r"[A-Z'\-]+", w) for w in words)
+
+
+def is_private_owner(owner_name: str) -> bool:
+    if is_institutional_owner(owner_name):
+        return False
+    if is_individual_owner(owner_name):
+        return True
+    owner = owner_name.upper()
     return any(
         token in owner
         for token in ["LLC", "LP", "L.P.", "PARTNERS", "HOLDINGS", "FAMILY", "ESTATE", "TRUST", "APARTMENTS"]
@@ -65,6 +94,8 @@ def is_private_owner(owner_name: str) -> bool:
 
 
 def is_721_owner_type(owner_name: str) -> bool:
+    if is_individual_owner(owner_name):
+        return True
     owner = owner_name.upper()
     return is_private_owner(owner) and any(
         token in owner for token in ["LLC", "LP", "L.P.", "PARTNERS", "FAMILY", "ESTATE", "TRUST", "APARTMENTS"]
@@ -107,12 +138,14 @@ def score_ownership_type(owner_name: str) -> float:
     owner = owner_name.upper()
     if is_institutional_owner(owner):
         return 20
-    if any(token in owner for token in ["TRUST", "FAMILY", "ESTATE"]):
-        return 95
-    if any(token in owner for token in ["LLC", "LP", "L.P.", "PARTNERS", "HOLDINGS", "APARTMENTS"]):
-        return 84
     if any(token in owner for token in ["NONPROFIT", "HOUSING AUTHORITY", "CITY OF"]):
         return 18
+    if any(token in owner for token in ["TRUST", "FAMILY", "ESTATE"]):
+        return 95
+    if is_individual_owner(owner_name):
+        return 92
+    if any(token in owner for token in ["LLC", "LP", "L.P.", "PARTNERS", "HOLDINGS", "APARTMENTS"]):
+        return 84
     return 68
 
 
