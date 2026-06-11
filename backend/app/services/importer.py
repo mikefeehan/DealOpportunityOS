@@ -352,7 +352,10 @@ def import_universe(
             pima = {}
 
         year_built = _to_year(get(row, "year_built")) or int(_to_float(pima.get("year_built", 0))) or 1985
-        last_sale_year = _to_year(get(row, "last_sale_year")) or DEFAULT_LAST_SALE_YEAR
+        # No recorded sale -> treat as held since built (an original, long-hold
+        # owner is a key motivation signal). Fall back to a neutral placeholder
+        # only when neither a sale date nor a build year is available.
+        last_sale_year = _to_year(get(row, "last_sale_year")) or year_built or DEFAULT_LAST_SALE_YEAR
         average_rent = _to_float(get(row, "average_rent"))
         market_rent = _to_float(get(row, "market_rent"))
         if market_rent and not average_rent:
